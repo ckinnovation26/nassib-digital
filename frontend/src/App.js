@@ -1,51 +1,104 @@
-import { useEffect } from "react";
-import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import '@/App.css';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { Login } from './pages/Login';
+import { WaiterDashboard } from './pages/WaiterDashboard';
+import { KitchenDashboard } from './pages/KitchenDashboard';
+import { AccountingDashboard } from './pages/AccountingDashboard';
+import { Payment } from './pages/Payment';
+import { Toaster } from 'sonner';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+const RoleBasedRedirect = () => {
+  const { user, loading } = useAuth();
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-slate-400">Chargement...</div>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
 
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
+  switch (user.role) {
+    case 'chef':
+      return <Navigate to="/kitchen" replace />;
+    case 'accountant':
+    case 'admin':
+      return <Navigate to="/accounting" replace />;
+    default:
+      return <Navigate to="/waiter" replace />;
+  }
 };
 
 function App() {
   return (
     <div className="App">
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
+        <AuthProvider>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              className: 'bg-slate-900 border-slate-800 text-slate-50',
+            }}
+          />
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<RoleBasedRedirect />} />
+            <Route
+              path="/waiter"
+              element={
+                <ProtectedRoute roles={['waiter', 'admin']}>
+                  <WaiterDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/kitchen"
+              element={
+                <ProtectedRoute roles={['chef', 'admin']}>
+                  <KitchenDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/accounting"
+              element={
+                <ProtectedRoute roles={['accountant', 'admin']}>
+                  <AccountingDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payment/:orderId"
+              element={
+                <ProtectedRoute>
+                  <Payment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payment/success"
+              element={
+                <ProtectedRoute>
+                  <Payment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payment/cancel"
+              element={
+                <ProtectedRoute>
+                  <Payment />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </div>
   );
