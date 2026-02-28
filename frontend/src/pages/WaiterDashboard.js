@@ -182,20 +182,20 @@ export const WaiterDashboard = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 chiromani-pattern pb-24" data-testid="waiter-dashboard">
-      <header className="bg-slate-900 border-b border-slate-800 p-4" data-testid="waiter-header">
+      <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b-2 border-rose-600/50 shadow-lg shadow-rose-600/20 p-4" data-testid="waiter-header">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div>
-            <h1 className="text-xl font-bold text-slate-50">Nassib</h1>
-            <p className="text-sm text-slate-400">Serveur: {user?.name}</p>
+            <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-amber-500">NASSIB</h1>
+            <p className="text-xs text-slate-400 font-medium tracking-wide">Serveur: {user?.name}</p>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={logout}
             data-testid="logout-button"
-            className="text-slate-400 hover:text-rose-600"
+            className="text-slate-400 hover:text-rose-400 hover:bg-rose-500/10"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-5 h-5" />
           </Button>
         </div>
       </header>
