@@ -161,7 +161,10 @@ export const WaiterDashboard = () => {
 
       <main className="max-w-7xl mx-auto p-4 space-y-6">
         <section data-testid="tables-section">
-          <h2 className="text-lg font-semibold text-slate-50 mb-3">Tables</h2>
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-lg font-semibold text-slate-50">Tables</h2>
+            <p className="text-xs text-slate-400">Cliquez sur une table pour commander</p>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {tables.map(table => (
               <Card
