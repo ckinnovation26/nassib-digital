@@ -250,10 +250,10 @@ export const WaiterDashboard = () => {
                     setSelectedTable(null);
                     setCart([]);
                   }}
-                  className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+                  className="h-12 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-lg shadow-xl shadow-rose-500/40 transition-all hover:scale-105"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nouvelle commande
+                  <Plus className="w-6 h-6 mr-2" />
+                  NOUVELLE COMMANDE
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-800" data-testid="order-dialog">
