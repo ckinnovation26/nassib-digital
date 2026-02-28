@@ -259,7 +259,7 @@ export const WaiterDashboard = () => {
                         >
                           <div className="text-sm font-semibold text-slate-50">{item.name}</div>
                           <div className="text-xs text-slate-400 mt-1">{item.category}</div>
-                          <div className="text-sm font-mono text-rose-600 mt-2">formatCurrency(item.price)</div>
+                          <div className="text-sm font-mono text-rose-600 mt-2">{formatCurrency(item.price)}</div>
                         </Card>
                       ))}
                     </div>
