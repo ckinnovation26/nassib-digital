@@ -164,7 +164,7 @@ export const Payment = () => {
                 {order?.items.map((item, idx) => (
                   <div key={idx} className="flex justify-between text-sm">
                     <span className="text-slate-300">{item.menu_item_name} x{item.quantity}</span>
-                    <span className="text-slate-300 font-mono">${(item.price * item.quantity).toFixed(2)}</span>
+                    <span className="text-slate-300 font-mono">{formatCurrency(item.price * item.quantity)}</span>
                   </div>
                 ))}
               </div>

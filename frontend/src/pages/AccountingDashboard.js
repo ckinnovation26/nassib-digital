@@ -136,7 +136,7 @@ export const AccountingDashboard = () => {
                       <td className="py-3 text-sm font-mono text-slate-400">{order.id.slice(0, 8)}</td>
                       <td className="py-3 text-sm font-mono font-bold text-slate-50">{order.table_number}</td>
                       <td className="py-3 text-sm text-slate-400">{order.waiter_name}</td>
-                      <td className="py-3 text-sm font-mono font-bold text-rose-600">${order.total.toFixed(2)}</td>
+                      <td className="py-3 text-sm font-mono font-bold text-rose-600">{formatCurrency(order.total)}</td>
                       <td className="py-3 text-sm">
                         <span className={`px-2 py-1 rounded-md text-xs font-medium ${
                           order.status === 'served' ? 'bg-green-500/20 text-green-500' :
