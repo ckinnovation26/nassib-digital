@@ -21,6 +21,8 @@ export const WaiterDashboard = () => {
   const [selectedTable, setSelectedTable] = useState(null);
   const [cart, setCart] = useState([]);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
