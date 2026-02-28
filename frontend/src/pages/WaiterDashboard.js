@@ -324,7 +324,7 @@ export const WaiterDashboard = () => {
                     <div className="text-xs text-slate-400 mt-1">Commande #{order.id.slice(0, 8)}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold font-mono text-rose-600">formatCurrency(order.total)</div>
+                    <div className="text-xl font-bold font-mono text-rose-600">{formatCurrency(order.total)}</div>
                     {order.payment_status === 'paid' && (
                       <div className="text-xs text-green-500 mt-1">✓ Payé</div>
                     )}
@@ -335,7 +335,7 @@ export const WaiterDashboard = () => {
                   {order.items.map((item, idx) => (
                     <div key={idx} className="text-sm text-slate-300 flex justify-between">
                       <span>{item.menu_item_name} x{item.quantity}</span>
-                      <span className="font-mono">formatCurrency(item.price * item.quantity)</span>
+                      <span className="font-mono">{formatCurrency(item.price * item.quantity)}</span>
                     </div>
                   ))}
                 </div>
