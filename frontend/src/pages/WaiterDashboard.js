@@ -413,6 +413,41 @@ export const WaiterDashboard = () => {
             ))}
           </div>
         </section>
+
+        {/* Dialog choix de paiement */}
+        <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+          <DialogContent className="max-w-md bg-slate-900 border-slate-800" data-testid="payment-choice-dialog">
+            <DialogHeader>
+              <DialogTitle className="text-slate-50 text-xl">Mode de paiement</DialogTitle>
+              <DialogDescription className="text-slate-400">
+                Table {selectedOrderForPayment?.table_number} - {selectedOrderForPayment && formatCurrency(selectedOrderForPayment.total)}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 mt-4">
+              <Button
+                onClick={handleCashPayment}
+                data-testid="cash-payment-button"
+                className="w-full h-16 bg-green-600 hover:bg-green-700 text-white font-semibold text-lg"
+              >
+                💵 Paiement Cash (KMF)
+              </Button>
+              <Button
+                onClick={handleCardPayment}
+                data-testid="card-payment-button"
+                className="w-full h-16 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-lg"
+              >
+                💳 Paiement par Carte
+              </Button>
+              <Button
+                onClick={() => setIsPaymentDialogOpen(false)}
+                variant="ghost"
+                className="w-full text-slate-400 hover:text-slate-300"
+              >
+                Annuler
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
