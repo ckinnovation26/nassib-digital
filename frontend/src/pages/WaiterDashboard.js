@@ -212,17 +212,21 @@ export const WaiterDashboard = () => {
                 key={table.id}
                 data-testid={`table-${table.number}`}
                 onClick={() => table.status === 'free' && openOrderDialog(table)}
-                className={`p-4 cursor-pointer border transition-colors ${
+                className={`group relative p-6 cursor-pointer border-2 transition-all duration-300 overflow-hidden ${
                   table.status === 'free'
-                    ? 'bg-slate-900 border-slate-800 hover:border-rose-600'
-                    : 'bg-rose-600/10 border-rose-600/30 cursor-not-allowed'
+                    ? 'bg-gradient-to-br from-emerald-900/30 to-slate-900 border-emerald-600/50 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/30 hover:scale-105'
+                    : 'bg-gradient-to-br from-rose-900/30 to-slate-900 border-rose-600/50 cursor-not-allowed opacity-75'
                 }`}
               >
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-slate-50 font-mono">{table.number}</div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    {table.status === 'free' ? 'Libre' : 'Occupée'}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div className="relative text-center">
+                  <div className="text-4xl font-black text-slate-50 font-mono tracking-wider drop-shadow-lg">{table.number}</div>
+                  <div className={`text-xs font-bold mt-2 uppercase tracking-wide ${
+                    table.status === 'free' ? 'text-emerald-400' : 'text-rose-400'
+                  }`}>
+                    {table.status === 'free' ? '✓ Libre' : '● Occupée'}
                   </div>
+                  <div className="text-xs text-slate-500 mt-1">{table.capacity} pers.</div>
                 </div>
               </Card>
             ))}
