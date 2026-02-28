@@ -361,76 +361,81 @@ export const WaiterDashboard = () => {
 
           <div className="space-y-3">
             {orders.filter(o => o.status !== 'completed').map(order => (
-              <Card key={order.id} data-testid={`order-${order.id}`} className="bg-slate-900 border-slate-800 p-4">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-bold text-slate-50 font-mono">Table {order.table_number}</span>
-                      <span className={`text-xs px-2 py-1 rounded-md border font-medium ${getStatusColor(order.status)}`}>
-                        {getStatusLabel(order.status)}
-                      </span>
+              <Card key={order.id} data-testid={`order-${order.id}`} className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 border-2 border-slate-700 hover:border-rose-500/50 transition-all">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-600 via-amber-500 to-rose-600"></div>
+                <div className="p-5">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl font-black text-slate-50 font-mono">Table {order.table_number}</span>
+                        <span className={`text-xs px-3 py-1.5 rounded-full border-2 font-bold uppercase tracking-wide ${getStatusColor(order.status)}`}>
+                          {getStatusLabel(order.status)}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">#{order.id.slice(0, 8)}</div>
                     </div>
-                    <div className="text-xs text-slate-400 mt-1">Commande #{order.id.slice(0, 8)}</div>
+                    <div className="text-right">
+                      <div className="text-3xl font-black font-mono bg-gradient-to-r from-rose-500 to-amber-500 bg-clip-text text-transparent">
+                        {formatCurrency(order.total)}
+                      </div>
+                      {order.payment_status === 'paid' && (
+                        <div className="text-xs text-emerald-400 font-bold mt-1">✓ PAYÉ</div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-xl font-bold font-mono text-rose-600">{formatCurrency(order.total)}</div>
-                    {order.payment_status === 'paid' && (
-                      <div className="text-xs text-green-500 mt-1">✓ Payé</div>
+
+                  <div className="space-y-2 mb-4 bg-slate-950/50 rounded-lg p-3">
+                    {order.items.map((item, idx) => (
+                      <div key={idx} className="text-sm text-slate-300 flex justify-between items-center hover:text-slate-50 transition-colors">
+                        <span className="font-medium">{item.menu_item_name} <span className="text-amber-500 font-bold">x{item.quantity}</span></span>
+                        <span className="font-mono font-bold text-rose-400">{formatCurrency(item.price * item.quantity)}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2">
+                    {order.status === 'ready' && (
+                      <Button
+                        onClick={() => markAsServed(order.id)}
+                        data-testid={`mark-served-${order.id}`}
+                        className="flex-1 h-12 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white font-bold text-base shadow-lg shadow-purple-500/30"
+                      >
+                        <CheckCircle className="w-5 h-5 mr-2" />
+                        SERVIE
+                      </Button>
+                    )}
+                    {order.status === 'served' && order.payment_status !== 'paid' && (
+                      <Button
+                        onClick={() => handlePayment(order.id)}
+                        data-testid={`pay-button-${order.id}`}
+                        className="flex-1 h-12 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold text-base shadow-lg shadow-rose-500/30"
+                      >
+                        PAYER
+                      </Button>
+                    )}
+                    {order.payment_status === 'paid' && order.status !== 'completed' && (
+                      <Button
+                        onClick={() => markAsCompleted(order.id)}
+                        data-testid={`complete-order-${order.id}`}
+                        className="flex-1 h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-base shadow-lg shadow-emerald-500/30"
+                      >
+                        <CheckCircle className="w-5 h-5 mr-2" />
+                        TERMINER
+                      </Button>
+                    )}
+                    {order.status === 'pending' && (
+                      <div className="flex-1 h-12 flex items-center justify-center gap-2 text-amber-500 text-sm font-bold bg-amber-500/10 rounded-lg border-2 border-amber-500/30">
+                        <Clock className="w-5 h-5" />
+                        EN ATTENTE
+                      </div>
+                    )}
+                    {(order.status === 'in_progress' || order.status === 'served') && order.payment_status !== 'paid' && (
+                      <div className="flex-1 h-12 flex items-center justify-center gap-2 text-blue-400 text-sm font-bold bg-blue-500/10 rounded-lg border-2 border-blue-500/30">
+                        <Clock className="w-5 h-5" />
+                        {order.status === 'in_progress' ? 'EN PRÉPARATION' : 'EN COURS'}
+                      </div>
                     )}
                   </div>
-                </div>
-
-                <div className="space-y-1 mb-3">
-                  {order.items.map((item, idx) => (
-                    <div key={idx} className="text-sm text-slate-300 flex justify-between">
-                      <span>{item.menu_item_name} x{item.quantity}</span>
-                      <span className="font-mono">{formatCurrency(item.price * item.quantity)}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex gap-2">
-                  {order.status === 'ready' && (
-                    <Button
-                      onClick={() => markAsServed(order.id)}
-                      data-testid={`mark-served-${order.id}`}
-                      className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Servie
-                    </Button>
-                  )}
-                  {order.status === 'served' && order.payment_status !== 'paid' && (
-                    <Button
-                      onClick={() => handlePayment(order.id)}
-                      data-testid={`pay-button-${order.id}`}
-                      className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold"
-                    >
-                      Payer
-                    </Button>
-                  )}
-                  {order.payment_status === 'paid' && order.status !== 'completed' && (
-                    <Button
-                      onClick={() => markAsCompleted(order.id)}
-                      data-testid={`complete-order-${order.id}`}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Terminer (Libérer table)
-                    </Button>
-                  )}
-                  {order.status === 'pending' && (
-                    <div className="flex-1 flex items-center justify-center gap-2 text-amber-500 text-sm">
-                      <Clock className="w-4 h-4" />
-                      En attente
-                    </div>
-                  )}
-                  {(order.status === 'in_progress' || order.status === 'served') && order.payment_status !== 'paid' && (
-                    <div className="flex-1 flex items-center justify-center gap-2 text-blue-500 text-sm">
-                      <Clock className="w-4 h-4" />
-                      {order.status === 'in_progress' ? 'En préparation' : 'En cours'}
-                    </div>
-                  )}
                 </div>
               </Card>
             ))}
