@@ -290,7 +290,7 @@ export const WaiterDashboard = () => {
                         <div className="flex justify-between items-center pt-2 border-t border-slate-700">
                           <span className="text-sm font-semibold text-slate-50">Total</span>
                           <span className="text-lg font-mono font-bold text-rose-600">
-                            formatCurrency(cart.reduce((sum, item) => sum + item.price * item.quantity, 0))
+                            {formatCurrency(cart.reduce((sum, item) => sum + item.price * item.quantity, 0))}
                           </span>
                         </div>
                       </div>
