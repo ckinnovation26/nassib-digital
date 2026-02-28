@@ -191,10 +191,20 @@ export const WaiterDashboard = () => {
         <section data-testid="orders-section">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold text-slate-50">Commandes actives</h2>
-            <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
+            <Dialog open={isOrderDialogOpen} onOpenChange={(open) => {
+              setIsOrderDialogOpen(open);
+              if (!open) {
+                setSelectedTable(null);
+                setCart([]);
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button
                   data-testid="new-order-button"
+                  onClick={() => {
+                    setSelectedTable(null);
+                    setCart([]);
+                  }}
                   className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
                 >
                   <Plus className="w-4 h-4 mr-2" />
