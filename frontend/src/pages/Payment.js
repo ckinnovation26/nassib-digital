@@ -87,7 +87,8 @@ export const Payment = () => {
         window.location.href = response.data.url;
       }
     } catch (error) {
-      toast.error('Erreur lors de la création de la session de paiement');
+      const errorMsg = error.response?.data?.detail || 'Erreur lors de la création de la session de paiement';
+      toast.error(errorMsg);
       setProcessing(false);
     }
   };
