@@ -172,7 +172,7 @@ export const Payment = () => {
             </div>
             <div className="border-t border-slate-700 pt-2 mt-2 flex justify-between">
               <span className="text-slate-50 font-semibold">Total</span>
-              <span className="text-2xl font-bold font-mono text-rose-600">${order?.total.toFixed(2)}</span>
+              <span className="text-2xl font-bold font-mono text-rose-600">{formatCurrency(order?.total || 0)}</span>
             </div>
           </div>
 
