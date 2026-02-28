@@ -107,6 +107,16 @@ export const WaiterDashboard = () => {
     }
   };
 
+  const markAsCompleted = async (orderId) => {
+    try {
+      await axios.put(`${API}/orders/${orderId}/status`, { status: 'completed' });
+      toast.success('Table libérée!');
+      fetchData();
+    } catch (error) {
+      toast.error('Erreur mise à jour');
+    }
+  };
+
   const handlePayment = (orderId) => {
     navigate(`/payment/${orderId}`);
   };
@@ -116,7 +126,9 @@ export const WaiterDashboard = () => {
       case 'pending': return 'bg-amber-500/20 text-amber-500 border-amber-500/30';
       case 'in_progress': return 'bg-blue-500/20 text-blue-500 border-blue-500/30';
       case 'ready': return 'bg-green-500/20 text-green-500 border-green-500/30';
-      case 'served': return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+      case 'served': return 'bg-purple-500/20 text-purple-500 border-purple-500/30';
+      case 'paid': return 'bg-emerald-500/20 text-emerald-500 border-emerald-500/30';
+      case 'completed': return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
       default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
     }
   };
@@ -127,6 +139,8 @@ export const WaiterDashboard = () => {
       case 'in_progress': return 'En préparation';
       case 'ready': return 'Prête';
       case 'served': return 'Servie';
+      case 'paid': return 'Payée';
+      case 'completed': return 'Terminée';
       default: return status;
     }
   };
