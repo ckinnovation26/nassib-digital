@@ -121,7 +121,31 @@ export const WaiterDashboard = () => {
   };
 
   const handlePayment = (orderId) => {
-    navigate(`/payment/${orderId}`);
+    const order = orders.find(o => o.id === orderId);
+    setSelectedOrderForPayment(order);
+    setIsPaymentDialogOpen(true);
+  };
+
+  const handleCashPayment = async () => {
+    if (!selectedOrderForPayment) return;
+
+    try {
+      await axios.post(`${API}/payment/cash`, {
+        order_id: selectedOrderForPayment.id
+      });
+      toast.success('Paiement cash enregistré!');
+      setIsPaymentDialogOpen(false);
+      setSelectedOrderForPayment(null);
+      fetchData();
+    } catch (error) {
+      toast.error('Erreur enregistrement paiement');
+    }
+  };
+
+  const handleCardPayment = () => {
+    if (!selectedOrderForPayment) return;
+    setIsPaymentDialogOpen(false);
+    navigate(`/payment/${selectedOrderForPayment.id}`);
   };
 
   const getStatusColor = (status) => {
