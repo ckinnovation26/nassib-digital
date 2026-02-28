@@ -379,8 +379,10 @@ async def create_checkout_session(checkout_req: CheckoutRequest, current_user: D
     if order["payment_status"] == "paid":
         raise HTTPException(status_code=400, detail="Commande déjà payée")
     
-    amount = float(order["total"])
-    currency = "eur"  # Stripe ne supporte pas KMF, on utilise EUR
+    # Conversion KMF → EUR (1 EUR = 491.96775 KMF)
+    amount_kmf = float(order["total"])
+    amount_eur = round(amount_kmf / 491.96775, 2)
+    currency = "eur"
     
     success_url = f"{checkout_req.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}"
     cancel_url = f"{checkout_req.origin_url}/payment/cancel"
