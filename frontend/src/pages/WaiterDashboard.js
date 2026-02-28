@@ -310,7 +310,7 @@ export const WaiterDashboard = () => {
           </div>
 
           <div className="space-y-3">
-            {orders.filter(o => o.status !== 'served').map(order => (
+            {orders.filter(o => o.status !== 'completed').map(order => (
               <Card key={order.id} data-testid={`order-${order.id}`} className="bg-slate-900 border-slate-800 p-4">
                 <div className="flex justify-between items-start mb-3">
                   <div>
@@ -325,7 +325,7 @@ export const WaiterDashboard = () => {
                   <div className="text-right">
                     <div className="text-xl font-bold font-mono text-rose-600">${order.total.toFixed(2)}</div>
                     {order.payment_status === 'paid' && (
-                      <div className="text-xs text-green-500 mt-1">Payé</div>
+                      <div className="text-xs text-green-500 mt-1">✓ Payé</div>
                     )}
                   </div>
                 </div>
@@ -344,13 +344,13 @@ export const WaiterDashboard = () => {
                     <Button
                       onClick={() => markAsServed(order.id)}
                       data-testid={`mark-served-${order.id}`}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                      className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold"
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
                       Servie
                     </Button>
                   )}
-                  {order.payment_status !== 'paid' && (
+                  {order.status === 'served' && order.payment_status !== 'paid' && (
                     <Button
                       onClick={() => handlePayment(order.id)}
                       data-testid={`pay-button-${order.id}`}
@@ -360,10 +360,26 @@ export const WaiterDashboard = () => {
                       Payer
                     </Button>
                   )}
+                  {order.payment_status === 'paid' && order.status !== 'completed' && (
+                    <Button
+                      onClick={() => markAsCompleted(order.id)}
+                      data-testid={`complete-order-${order.id}`}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                    >
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Terminer (Libérer table)
+                    </Button>
+                  )}
                   {order.status === 'pending' && (
                     <div className="flex-1 flex items-center justify-center gap-2 text-amber-500 text-sm">
                       <Clock className="w-4 h-4" />
                       En attente
+                    </div>
+                  )}
+                  {(order.status === 'in_progress' || order.status === 'served') && order.payment_status !== 'paid' && (
+                    <div className="flex-1 flex items-center justify-center gap-2 text-blue-500 text-sm">
+                      <Clock className="w-4 h-4" />
+                      {order.status === 'in_progress' ? 'En préparation' : 'En cours'}
                     </div>
                   )}
                 </div>
