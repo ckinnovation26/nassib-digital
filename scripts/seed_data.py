@@ -150,7 +150,7 @@ async def seed_database():
             "id": str(uuid.uuid4()),
             "name": "Bananes Flambées",
             "description": "Bananes flambées au rhum et vanille",
-            "price": 5.50,
+            "price": 550,
             "category": "Desserts",
             "image_url": "",
             "available": True,
