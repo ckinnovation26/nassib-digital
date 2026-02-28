@@ -10,6 +10,13 @@ import { formatCurrency } from '../utils/currency';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+// Taux de conversion KMF → EUR
+const KMF_TO_EUR_RATE = 491.96775;
+
+const convertKMFtoEUR = (kmf) => {
+  return (kmf / KMF_TO_EUR_RATE).toFixed(2);
+};
+
 export const Payment = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
