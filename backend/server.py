@@ -394,13 +394,14 @@ async def create_checkout_session(checkout_req: CheckoutRequest, current_user: D
     stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
     
     checkout_request = CheckoutSessionRequest(
-        amount=amount,
+        amount=amount_eur,
         currency=currency,
         success_url=success_url,
         cancel_url=cancel_url,
         metadata={
             "order_id": checkout_req.order_id,
-            "user_id": current_user["user_id"]
+            "user_id": current_user["user_id"],
+            "amount_kmf": str(amount_kmf)
         }
     )
     
@@ -408,11 +409,11 @@ async def create_checkout_session(checkout_req: CheckoutRequest, current_user: D
     
     transaction = PaymentTransaction(
         order_id=checkout_req.order_id,
-        amount=amount,
+        amount=amount_eur,
         currency=currency,
         session_id=session.session_id,
         payment_status="initiated",
-        metadata={"user_id": current_user["user_id"]}
+        metadata={"user_id": current_user["user_id"], "amount_kmf": amount_kmf}
     )
     
     transaction_dict = transaction.model_dump()
@@ -420,6 +421,12 @@ async def create_checkout_session(checkout_req: CheckoutRequest, current_user: D
     transaction_dict["updated_at"] = transaction_dict["updated_at"].isoformat()
     
     await db.payment_transactions.insert_one(transaction_dict)
+    
+    # Marquer la méthode de paiement
+    await db.orders.update_one(
+        {"id": checkout_req.order_id},
+        {"$set": {"payment_method": "card"}}
+    )
     
     return {"url": session.url, "session_id": session.session_id}
 
