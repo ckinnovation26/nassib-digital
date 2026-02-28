@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { toast } from 'sonner';
 import { Plus, LogOut, DollarSign, CheckCircle, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { formatCurrency } from '../utils/currency';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
