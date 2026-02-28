@@ -61,9 +61,12 @@ export const Login = () => {
       <Card className="w-full max-w-md bg-slate-900 border-slate-800" data-testid="login-card">
         <CardHeader className="space-y-3">
           <div className="flex justify-center mb-2">
-            <div className="w-16 h-16 bg-rose-600 rounded-md flex items-center justify-center" data-testid="logo">
-              <ChefHat className="w-10 h-10 text-white" />
-            </div>
+            <img 
+              src="https://customer-assets.emergentagent.com/job_nassib-digital/artifacts/et6rs79p_IMG_9019.jpeg"
+              alt="Logo Nassib"
+              className="w-32 h-32 object-contain"
+              data-testid="logo"
+            />
           </div>
           <CardTitle className="text-2xl text-center text-slate-50">
             {isRegister ? 'Créer un compte' : 'Connexion'}
