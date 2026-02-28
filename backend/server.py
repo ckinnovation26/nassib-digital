@@ -382,6 +382,15 @@ async def create_checkout_session(checkout_req: CheckoutRequest, current_user: D
     # Conversion KMF → EUR (1 EUR = 491.96775 KMF)
     amount_kmf = float(order["total"])
     amount_eur = round(amount_kmf / 491.96775, 2)
+    
+    # Vérifier le montant minimum de Stripe (0.50 EUR)
+    if amount_eur < 0.50:
+        min_kmf = round(0.50 * 491.96775, 0)
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Le montant est trop faible pour le paiement par carte. Minimum : {min_kmf} KMF (0.50 EUR). Veuillez utiliser le paiement cash."
+        )
+    
     currency = "eur"
     
     success_url = f"{checkout_req.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}"
