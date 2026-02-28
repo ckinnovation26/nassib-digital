@@ -275,7 +275,7 @@ export const WaiterDashboard = () => {
                               {item.menu_item_name} x{item.quantity}
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-mono text-slate-400">formatCurrency(item.price * item.quantity)</span>
+                              <span className="text-sm font-mono text-slate-400">{formatCurrency(item.price * item.quantity)}</span>
                               <Button
                                 size="sm"
                                 variant="ghost"
