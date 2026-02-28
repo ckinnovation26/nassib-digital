@@ -383,7 +383,6 @@ export const WaiterDashboard = () => {
                       data-testid={`pay-button-${order.id}`}
                       className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold"
                     >
-                      <DollarSign className="w-4 h-4 mr-2" />
                       Payer
                     </Button>
                   )}
