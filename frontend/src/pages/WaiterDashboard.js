@@ -167,10 +167,11 @@ export const WaiterDashboard = () => {
               <Card
                 key={table.id}
                 data-testid={`table-${table.number}`}
+                onClick={() => table.status === 'free' && openOrderDialog(table)}
                 className={`p-4 cursor-pointer border transition-colors ${
                   table.status === 'free'
                     ? 'bg-slate-900 border-slate-800 hover:border-rose-600'
-                    : 'bg-rose-600/10 border-rose-600/30'
+                    : 'bg-rose-600/10 border-rose-600/30 cursor-not-allowed'
                 }`}
               >
                 <div className="text-center">
