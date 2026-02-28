@@ -69,6 +69,13 @@ export const WaiterDashboard = () => {
     setCart(cart.filter(c => c.menu_item_id !== itemId));
   };
 
+  const openOrderDialog = (table = null) => {
+    if (table) {
+      setSelectedTable(table);
+    }
+    setIsOrderDialogOpen(true);
+  };
+
   const createOrder = async () => {
     if (!selectedTable || cart.length === 0) {
       toast.error('Sélectionnez une table et ajoutez des items');
