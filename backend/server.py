@@ -492,6 +492,46 @@ async def stripe_webhook(request: Request):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+class CashPaymentRequest(BaseModel):
+    order_id: str
+
+@api_router.post("/payment/cash")
+async def process_cash_payment(payment_req: CashPaymentRequest, current_user: Dict = Depends(get_current_user)):
+    order = await db.orders.find_one({"id": payment_req.order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande non trouvée")
+    
+    if order["payment_status"] == "paid":
+        raise HTTPException(status_code=400, detail="Commande déjà payée")
+    
+    # Marquer comme payé en cash
+    await db.orders.update_one(
+        {"id": payment_req.order_id},
+        {"$set": {
+            "payment_status": "paid",
+            "payment_method": "cash",
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    # Créer une transaction cash pour les records
+    transaction = PaymentTransaction(
+        order_id=payment_req.order_id,
+        amount=float(order["total"]),
+        currency="KMF",
+        session_id=None,
+        payment_status="paid",
+        metadata={"user_id": current_user["user_id"], "method": "cash"}
+    )
+    
+    transaction_dict = transaction.model_dump()
+    transaction_dict["created_at"] = transaction_dict["created_at"].isoformat()
+    transaction_dict["updated_at"] = transaction_dict["updated_at"].isoformat()
+    
+    await db.payment_transactions.insert_one(transaction_dict)
+    
+    return {"success": True, "message": "Paiement cash enregistré", "order_id": payment_req.order_id}
+
 @api_router.get("/stats/dashboard")
 async def get_dashboard_stats(current_user: Dict = Depends(get_current_user)):
     if current_user["role"] not in ["admin", "accountant"]:
