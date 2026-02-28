@@ -359,7 +359,8 @@ async def update_order_status(order_id: str, status_data: OrderStatusUpdate):
     if isinstance(order.get("updated_at"), str):
         order["updated_at"] = datetime.fromisoformat(order["updated_at"])
     
-    if status_data.status == "served":
+    # La table se libère seulement quand la commande est terminée (completed)
+    if status_data.status == "completed":
         await db.tables.update_one({"id": order["table_id"]}, {"$set": {"status": "free"}})
     
     return order
