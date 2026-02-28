@@ -259,7 +259,7 @@ export const WaiterDashboard = () => {
                         >
                           <div className="text-sm font-semibold text-slate-50">{item.name}</div>
                           <div className="text-xs text-slate-400 mt-1">{item.category}</div>
-                          <div className="text-sm font-mono text-rose-600 mt-2">${item.price}</div>
+                          <div className="text-sm font-mono text-rose-600 mt-2">formatCurrency(item.price)</div>
                         </Card>
                       ))}
                     </div>
@@ -275,7 +275,7 @@ export const WaiterDashboard = () => {
                               {item.menu_item_name} x{item.quantity}
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-mono text-slate-400">${(item.price * item.quantity).toFixed(2)}</span>
+                              <span className="text-sm font-mono text-slate-400">formatCurrency(item.price * item.quantity)</span>
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -290,7 +290,7 @@ export const WaiterDashboard = () => {
                         <div className="flex justify-between items-center pt-2 border-t border-slate-700">
                           <span className="text-sm font-semibold text-slate-50">Total</span>
                           <span className="text-lg font-mono font-bold text-rose-600">
-                            ${cart.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)}
+                            formatCurrency(cart.reduce((sum, item) => sum + item.price * item.quantity, 0))
                           </span>
                         </div>
                       </div>
@@ -324,7 +324,7 @@ export const WaiterDashboard = () => {
                     <div className="text-xs text-slate-400 mt-1">Commande #{order.id.slice(0, 8)}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold font-mono text-rose-600">${order.total.toFixed(2)}</div>
+                    <div className="text-xl font-bold font-mono text-rose-600">formatCurrency(order.total)</div>
                     {order.payment_status === 'paid' && (
                       <div className="text-xs text-green-500 mt-1">✓ Payé</div>
                     )}
@@ -335,7 +335,7 @@ export const WaiterDashboard = () => {
                   {order.items.map((item, idx) => (
                     <div key={idx} className="text-sm text-slate-300 flex justify-between">
                       <span>{item.menu_item_name} x{item.quantity}</span>
-                      <span className="font-mono">${(item.price * item.quantity).toFixed(2)}</span>
+                      <span className="font-mono">formatCurrency(item.price * item.quantity)</span>
                     </div>
                   ))}
                 </div>
