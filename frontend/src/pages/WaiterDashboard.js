@@ -275,17 +275,36 @@ export const WaiterDashboard = () => {
 
                   <div>
                     <label className="text-sm text-slate-300 mb-2 block">Menu</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto" data-testid="menu-items">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2" data-testid="menu-items">
                       {menuItems.filter(item => item.available).map(item => (
                         <Card
                           key={item.id}
                           data-testid={`menu-item-${item.id}`}
                           onClick={() => addToCart(item)}
-                          className="p-3 bg-slate-800 border-slate-700 hover:border-rose-600 cursor-pointer transition-colors"
+                          className="group relative overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-700 hover:border-rose-500 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-rose-500/20"
                         >
-                          <div className="text-sm font-semibold text-slate-50">{item.name}</div>
-                          <div className="text-xs text-slate-400 mt-1">{item.category}</div>
-                          <div className="text-sm font-mono text-rose-600 mt-2">{formatCurrency(item.price)}</div>
+                          {item.image_url && (
+                            <div className="h-32 overflow-hidden">
+                              <img 
+                                src={item.image_url} 
+                                alt={item.name}
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                              />
+                            </div>
+                          )}
+                          <div className="p-3">
+                            <div className="text-base font-bold text-slate-50 group-hover:text-rose-400 transition-colors">{item.name}</div>
+                            <div className="text-xs text-slate-400 mt-1 line-clamp-2">{item.description}</div>
+                            <div className="flex items-center justify-between mt-3">
+                              <span className="inline-block px-2 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-md font-medium">
+                                {item.category}
+                              </span>
+                              <span className="text-lg font-black text-rose-500 font-mono">{formatCurrency(item.price)}</span>
+                            </div>
+                          </div>
+                          <div className="absolute top-2 right-2 w-8 h-8 bg-rose-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Plus className="w-5 h-5 text-white" />
+                          </div>
                         </Card>
                       ))}
                     </div>
