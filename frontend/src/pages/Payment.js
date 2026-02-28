@@ -180,8 +180,17 @@ export const Payment = () => {
             </div>
             <div className="border-t border-slate-700 pt-2 mt-2 flex justify-between">
               <span className="text-slate-50 font-semibold">Total</span>
-              <span className="text-2xl font-bold font-mono text-rose-600">{formatCurrency(order?.total || 0)}</span>
+              <div className="text-right">
+                <div className="text-2xl font-bold font-mono text-rose-600">{formatCurrency(order?.total || 0)}</div>
+                <div className="text-xs text-slate-400 mt-1">≈ {convertKMFtoEUR(order?.total || 0)} EUR</div>
+              </div>
             </div>
+          </div>
+
+          <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-md">
+            <p className="text-xs text-amber-500">
+              💳 Paiement par carte : montant converti en EUR (1 EUR = {KMF_TO_EUR_RATE.toFixed(2)} KMF)
+            </p>
           </div>
 
           <Button
