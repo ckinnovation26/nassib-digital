@@ -29,8 +29,9 @@ const RoleBasedRedirect = () => {
     case 'chef':
       return <Navigate to="/kitchen" replace />;
     case 'accountant':
-    case 'admin':
       return <Navigate to="/accounting" replace />;
+    case 'admin':
+      return <Navigate to="/admin" replace />;
     default:
       return <Navigate to="/waiter" replace />;
   }
