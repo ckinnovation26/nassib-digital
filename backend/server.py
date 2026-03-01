@@ -289,6 +289,74 @@ async def update_table(table_id: str, table_data: TableUpdate):
     
     return updated
 
+@api_router.delete("/tables/{table_id}")
+async def delete_table(table_id: str, current_user: Dict = Depends(get_current_user)):
+    if current_user["role"] not in ["admin"]:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    
+    # Vérifier si la table a des commandes actives
+    active_orders = await db.orders.count_documents({
+        "table_id": table_id,
+        "status": {"$nin": ["completed", "cancelled"]}
+    })
+    if active_orders > 0:
+        raise HTTPException(status_code=400, detail="Impossible de supprimer une table avec des commandes actives")
+    
+    result = await db.tables.delete_one({"id": table_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Table non trouvée")
+    
+    return {"message": "Table supprimée"}
+
+@api_router.get("/users", response_model=List[User])
+async def get_users(current_user: Dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    
+    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
+    for user in users:
+        if isinstance(user.get("created_at"), str):
+            user["created_at"] = datetime.fromisoformat(user["created_at"])
+    return users
+
+@api_router.delete("/users/{user_id}")
+async def delete_user(user_id: str, current_user: Dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    
+    # Empêcher l'auto-suppression
+    if user_id == current_user["user_id"]:
+        raise HTTPException(status_code=400, detail="Vous ne pouvez pas supprimer votre propre compte")
+    
+    result = await db.users.delete_one({"id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    return {"message": "Utilisateur supprimé"}
+
+@api_router.put("/users/{user_id}")
+async def update_user(user_id: str, user_data: dict, current_user: Dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    
+    update_fields = {}
+    if "name" in user_data:
+        update_fields["name"] = user_data["name"]
+    if "role" in user_data:
+        update_fields["role"] = user_data["role"]
+    if "password" in user_data and user_data["password"]:
+        update_fields["password_hash"] = pwd_context.hash(user_data["password"])
+    
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="Aucun champ à mettre à jour")
+    
+    result = await db.users.update_one({"id": user_id}, {"$set": update_fields})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    updated = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    return updated
+
 @api_router.post("/orders", response_model=Order)
 async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get_current_user)):
     table = await db.tables.find_one({"id": order_data.table_id}, {"_id": 0})
