@@ -6,6 +6,7 @@ import { Login } from './pages/Login';
 import { WaiterDashboard } from './pages/WaiterDashboard';
 import { KitchenDashboard } from './pages/KitchenDashboard';
 import { AccountingDashboard } from './pages/AccountingDashboard';
+import { AdminDashboard } from './pages/AdminDashboard';
 import { Payment } from './pages/Payment';
 import { Toaster } from 'sonner';
 
