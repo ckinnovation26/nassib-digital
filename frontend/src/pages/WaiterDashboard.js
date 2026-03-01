@@ -263,16 +263,22 @@ export const WaiterDashboard = () => {
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm text-slate-300 mb-2 block">Table</label>
+                    <label className="text-sm text-slate-300 mb-2 block font-semibold">
+                      Table {selectedTable ? `✓ ${selectedTable.number} sélectionnée` : '⚠️ SÉLECTIONNEZ UNE TABLE'}
+                    </label>
                     <select
                       data-testid="table-select"
-                      className="w-full bg-slate-950 border border-slate-800 text-slate-50 rounded-md px-3 py-2"
+                      className={`w-full border rounded-md px-3 py-3 text-base font-medium ${
+                        selectedTable 
+                          ? 'bg-emerald-900/30 border-emerald-600 text-emerald-300' 
+                          : 'bg-rose-900/30 border-rose-600 text-rose-300 animate-pulse'
+                      }`}
                       value={selectedTable?.id || ''}
                       onChange={(e) => setSelectedTable(tables.find(t => t.id === e.target.value))}
                     >
-                      <option value="">Sélectionner une table</option>
+                      <option value="">⚠️ Sélectionner une table</option>
                       {tables.filter(t => t.status === 'free').map(table => (
-                        <option key={table.id} value={table.id}>Table {table.number}</option>
+                        <option key={table.id} value={table.id}>Table {table.number} ({table.capacity} pers.)</option>
                       ))}
                     </select>
                   </div>
