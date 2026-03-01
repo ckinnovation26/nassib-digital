@@ -49,8 +49,9 @@ export const Login = () => {
       case 'chef':
         return '/kitchen';
       case 'accountant':
-      case 'admin':
         return '/accounting';
+      case 'admin':
+        return '/admin';
       default:
         return '/waiter';
     }
