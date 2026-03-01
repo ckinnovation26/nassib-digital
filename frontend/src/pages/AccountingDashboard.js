@@ -152,10 +152,10 @@ export const AccountingDashboard = () => {
                       <td className="py-3 text-sm font-mono font-bold text-rose-600">{formatCurrency(order.total)}</td>
                       <td className="py-3 text-sm">
                         <span className={`px-2 py-1 rounded-md text-xs font-medium ${
-                          order.status === 'served' ? 'bg-green-500/20 text-green-500' :
-                          order.status === 'ready' ? 'bg-blue-500/20 text-blue-500' :
-                          order.status === 'in_progress' ? 'bg-amber-500/20 text-amber-500' :
                           order.status === 'completed' ? 'bg-slate-500/20 text-slate-400' :
+                          order.status === 'served' ? 'bg-purple-500/20 text-purple-400' :
+                          order.status === 'ready' ? 'bg-green-500/20 text-green-500' :
+                          order.status === 'in_progress' ? 'bg-blue-500/20 text-blue-400' :
                           'bg-amber-500/20 text-amber-500'
                         }`}>
                           {translateStatus(order.status)}
