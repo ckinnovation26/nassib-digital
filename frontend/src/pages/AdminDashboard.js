@@ -657,6 +657,9 @@ export const AdminDashboard = () => {
                     <Users className="w-5 h-5 text-rose-500" />
                     {editingUser ? 'Modifier l\'utilisateur' : 'Créer un utilisateur'}
                   </DialogTitle>
+                  <DialogDescription className="text-slate-400">
+                    {editingUser ? 'Modifiez les informations de l\'utilisateur' : 'Remplissez les informations du nouvel utilisateur'}
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
