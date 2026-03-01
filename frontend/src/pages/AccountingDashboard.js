@@ -10,6 +10,19 @@ import { formatCurrency } from '../utils/currency';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
+// Traduction des statuts en français
+const translateStatus = (status) => {
+  const translations = {
+    'pending': 'En attente',
+    'in_progress': 'En préparation',
+    'ready': 'Prête',
+    'served': 'Servie',
+    'paid': 'Payée',
+    'completed': 'Terminée'
+  };
+  return translations[status] || status;
+};
+
 export const AccountingDashboard = () => {
   const { user, logout } = useAuth();
   const [stats, setStats] = useState(null);
