@@ -422,6 +422,10 @@ async def update_order_status(order_id: str, status_data: OrderStatusUpdate):
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
+    # Si on passe en préparation, enregistrer l'heure de début
+    if status_data.status == "in_progress":
+        update_data["preparation_started_at"] = datetime.now(timezone.utc).isoformat()
+    
     result = await db.orders.update_one({"id": order_id}, {"$set": update_data})
     
     if result.matched_count == 0:
