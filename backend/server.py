@@ -94,6 +94,7 @@ class OrderItem(BaseModel):
     quantity: int
     price: float
     notes: Optional[str] = None
+    preparation_time: int = 15  # Temps de préparation en minutes
 
 class Order(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -107,6 +108,8 @@ class Order(BaseModel):
     status: str = "pending"
     payment_status: str = "unpaid"
     payment_method: Optional[str] = None  # "cash" ou "card"
+    preparation_started_at: Optional[str] = None  # Heure de début de préparation
+    estimated_preparation_time: int = 15  # Temps de préparation max en minutes
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
