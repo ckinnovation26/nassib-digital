@@ -73,7 +73,7 @@ export const AccountingDashboard = () => {
               <DollarSign className="w-4 h-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold font-mono text-slate-50">${stats?.total_revenue || 0}</div>
+              <div className="text-3xl font-bold font-mono text-slate-50">{formatCurrency(stats?.total_revenue || 0)}</div>
               <p className="text-xs text-slate-500 mt-2">Depuis le début</p>
             </CardContent>
           </Card>
@@ -84,7 +84,7 @@ export const AccountingDashboard = () => {
               <TrendingUp className="w-4 h-4 text-rose-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold font-mono text-slate-50">${stats?.today_revenue || 0}</div>
+              <div className="text-3xl font-bold font-mono text-slate-50">{formatCurrency(stats?.today_revenue || 0)}</div>
               <p className="text-xs text-slate-500 mt-2">{stats?.today_orders || 0} commandes</p>
             </CardContent>
           </Card>
