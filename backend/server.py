@@ -61,6 +61,7 @@ class MenuItem(BaseModel):
     category: str
     image_url: Optional[str] = None
     available: bool = True
+    preparation_time: int = 15  # Temps de préparation en minutes (défini par l'admin)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class MenuItemCreate(BaseModel):
@@ -70,6 +71,7 @@ class MenuItemCreate(BaseModel):
     category: str
     image_url: Optional[str] = None
     available: bool = True
+    preparation_time: int = 15  # Temps de préparation en minutes
 
 class Table(BaseModel):
     model_config = ConfigDict(extra="ignore")
