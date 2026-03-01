@@ -368,13 +368,31 @@ async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get
     
     total = sum(item.quantity * item.price for item in order_data.items)
     
+    # Récupérer les temps de préparation des plats et calculer le temps max
+    max_prep_time = 15  # Valeur par défaut
+    items_with_prep_time = []
+    
+    for item in order_data.items:
+        item_dict = item.model_dump()
+        # Chercher le temps de préparation dans le menu
+        menu_item = await db.menu_items.find_one({"id": item.menu_item_id}, {"_id": 0})
+        if menu_item:
+            prep_time = menu_item.get("preparation_time", 15)
+            item_dict["preparation_time"] = prep_time
+            if prep_time > max_prep_time:
+                max_prep_time = prep_time
+        else:
+            item_dict["preparation_time"] = 15
+        items_with_prep_time.append(item_dict)
+    
     order = Order(
         table_id=order_data.table_id,
         table_number=table["number"],
         waiter_id=current_user["user_id"],
         waiter_name=current_user.get("email", "Unknown"),
-        items=[item.model_dump() for item in order_data.items],
-        total=total
+        items=items_with_prep_time,
+        total=total,
+        estimated_preparation_time=max_prep_time
     )
     
     order_dict = order.model_dump()
