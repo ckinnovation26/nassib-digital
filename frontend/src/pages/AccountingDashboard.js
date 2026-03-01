@@ -155,9 +155,10 @@ export const AccountingDashboard = () => {
                           order.status === 'served' ? 'bg-green-500/20 text-green-500' :
                           order.status === 'ready' ? 'bg-blue-500/20 text-blue-500' :
                           order.status === 'in_progress' ? 'bg-amber-500/20 text-amber-500' :
-                          'bg-slate-500/20 text-slate-400'
+                          order.status === 'completed' ? 'bg-slate-500/20 text-slate-400' :
+                          'bg-amber-500/20 text-amber-500'
                         }`}>
-                          {order.status}
+                          {translateStatus(order.status)}
                         </span>
                       </td>
                       <td className="py-3 text-sm">
