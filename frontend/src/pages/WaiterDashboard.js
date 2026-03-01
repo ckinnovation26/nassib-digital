@@ -352,13 +352,27 @@ export const WaiterDashboard = () => {
                     </div>
                   )}
 
+                  {!selectedTable && cart.length > 0 && (
+                    <div className="mb-3 p-3 bg-rose-900/20 border-2 border-rose-600/50 rounded-lg text-center">
+                      <p className="text-rose-400 font-bold text-sm">⚠️ Sélectionnez une table ci-dessus pour continuer</p>
+                    </div>
+                  )}
+
                   <Button
                     onClick={createOrder}
                     data-testid="create-order-button"
-                    className="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+                    className={`w-full h-14 text-lg font-black ${
+                      !selectedTable || cart.length === 0
+                        ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white shadow-lg shadow-rose-500/30'
+                    }`}
                     disabled={!selectedTable || cart.length === 0}
                   >
-                    Créer la commande
+                    {!selectedTable 
+                      ? '⚠️ SÉLECTIONNEZ UNE TABLE' 
+                      : cart.length === 0 
+                        ? '⚠️ AJOUTEZ DES ITEMS' 
+                        : '✓ CRÉER LA COMMANDE'}
                   </Button>
                 </div>
               </DialogContent>
