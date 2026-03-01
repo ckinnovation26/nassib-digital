@@ -413,6 +413,9 @@ export const AdminDashboard = () => {
                     <UtensilsCrossed className="w-5 h-5 text-rose-500" />
                     {editingMenuItem ? 'Modifier le plat' : 'Ajouter un plat'}
                   </DialogTitle>
+                  <DialogDescription className="text-slate-400">
+                    Remplissez les informations du plat ci-dessous
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
