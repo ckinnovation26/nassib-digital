@@ -549,6 +549,9 @@ export const AdminDashboard = () => {
                     <Table2 className="w-5 h-5 text-rose-500" />
                     Ajouter une table
                   </DialogTitle>
+                  <DialogDescription className="text-slate-400">
+                    Définissez le numéro et la capacité de la table
+                  </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
