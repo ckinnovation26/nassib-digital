@@ -5,9 +5,10 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, LogOut, DollarSign, CheckCircle, Clock } from 'lucide-react';
+import { Plus, LogOut, DollarSign, CheckCircle, Clock, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../utils/currency';
+import { Input } from '../components/ui/input';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -24,6 +25,7 @@ export const WaiterDashboard = () => {
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -241,6 +243,7 @@ export const WaiterDashboard = () => {
               if (!open) {
                 setSelectedTable(null);
                 setCart([]);
+                setSearchQuery('');
               }
             }}>
               <DialogTrigger asChild>
@@ -285,8 +288,39 @@ export const WaiterDashboard = () => {
 
                   <div>
                     <label className="text-sm text-slate-300 mb-2 block">Menu</label>
+                    {/* Barre de recherche */}
+                    <div className="relative mb-3">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <Input
+                        type="text"
+                        placeholder="Rechercher un plat (ex: viande, poisson, pizza...)"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        data-testid="menu-search"
+                        className="pl-10 bg-slate-950 border-slate-700 text-slate-50 placeholder:text-slate-500 focus:border-rose-500"
+                      />
+                      {searchQuery && (
+                        <button
+                          onClick={() => setSearchQuery('')}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-rose-400"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2" data-testid="menu-items">
-                      {menuItems.filter(item => item.available).map(item => (
+                      {menuItems
+                        .filter(item => item.available)
+                        .filter(item => {
+                          if (!searchQuery.trim()) return true;
+                          const query = searchQuery.toLowerCase();
+                          return (
+                            item.name.toLowerCase().includes(query) ||
+                            item.category.toLowerCase().includes(query) ||
+                            (item.description && item.description.toLowerCase().includes(query))
+                          );
+                        })
+                        .map(item => (
                         <Card
                           key={item.id}
                           data-testid={`menu-item-${item.id}`}
@@ -317,6 +351,26 @@ export const WaiterDashboard = () => {
                           </div>
                         </Card>
                       ))}
+                      {/* Message si aucun résultat */}
+                      {searchQuery && menuItems.filter(item => item.available).filter(item => {
+                        const query = searchQuery.toLowerCase();
+                        return (
+                          item.name.toLowerCase().includes(query) ||
+                          item.category.toLowerCase().includes(query) ||
+                          (item.description && item.description.toLowerCase().includes(query))
+                        );
+                      }).length === 0 && (
+                        <div className="col-span-2 text-center py-8 text-slate-400">
+                          <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p>Aucun plat trouvé pour "{searchQuery}"</p>
+                          <button 
+                            onClick={() => setSearchQuery('')}
+                            className="mt-2 text-rose-400 hover:text-rose-300 text-sm underline"
+                          >
+                            Effacer la recherche
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
