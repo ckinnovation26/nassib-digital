@@ -14,7 +14,7 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 export const WaiterDashboard = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const navigate = useNavigate();
   const [tables, setTables] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
@@ -148,6 +148,33 @@ export const WaiterDashboard = () => {
     if (!selectedOrderForPayment) return;
     setIsPaymentDialogOpen(false);
     navigate(`/payment/${selectedOrderForPayment.id}`);
+  };
+
+  const downloadInvoice = async (orderId) => {
+    try {
+      toast.info('Génération de la facture...');
+      const response = await axios.get(`${API}/orders/${orderId}/invoice`, {
+        responseType: 'blob',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      // Créer un lien de téléchargement
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `facture_nassib_${orderId.slice(0, 8)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Facture téléchargée !');
+    } catch (error) {
+      console.error('Erreur téléchargement facture:', error);
+      toast.error('Erreur lors du téléchargement de la facture');
+    }
   };
 
   const getStatusColor = (status) => {
@@ -490,7 +517,7 @@ export const WaiterDashboard = () => {
                     {order.payment_status === 'paid' && order.status !== 'completed' && (
                       <>
                         <Button
-                          onClick={() => window.open(`${API}/orders/${order.id}/invoice`, '_blank')}
+                          onClick={() => downloadInvoice(order.id)}
                           data-testid={`invoice-${order.id}`}
                           className="h-12 px-4 bg-slate-700 hover:bg-slate-600 text-white font-bold text-base"
                         >
