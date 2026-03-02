@@ -701,20 +701,33 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     
     # Créer le PDF en mémoire
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=1.5*cm, bottomMargin=2*cm)
     
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#E11D48'), alignment=TA_CENTER, spaceAfter=20)
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=22, textColor=colors.HexColor('#E11D48'), alignment=TA_CENTER, spaceAfter=5)
     header_style = ParagraphStyle('Header', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#64748B'), alignment=TA_CENTER)
     section_style = ParagraphStyle('Section', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#1E293B'), spaceBefore=15, spaceAfter=10)
     normal_style = ParagraphStyle('Normal2', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#334155'))
+    contact_style = ParagraphStyle('Contact', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#F59E0B'), alignment=TA_CENTER)
     
     elements = []
     
+    # Logo Nassib (téléchargé depuis l'URL)
+    logo_url = "https://customer-assets.emergentagent.com/job_nassib-digital/artifacts/et6rs79p_IMG_9019.jpeg"
+    try:
+        import urllib.request
+        logo_data = io.BytesIO(urllib.request.urlopen(logo_url).read())
+        from reportlab.platypus import Image as PDFImage
+        logo = PDFImage(logo_data, width=3*cm, height=3*cm)
+        elements.append(logo)
+    except Exception as e:
+        pass  # Si le logo ne charge pas, on continue sans
+    
     # En-tête
     elements.append(Paragraph("FACTURE", title_style))
-    elements.append(Paragraph("Restaurant Nassib", header_style))
-    elements.append(Spacer(1, 20))
+    elements.append(Paragraph("Restaurant Nassib - Comores", header_style))
+    elements.append(Paragraph("<b>Livraison : +269 3320308</b>", contact_style))
+    elements.append(Spacer(1, 15))
     
     # Infos facture
     invoice_date = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -779,12 +792,17 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
         ('TEXTCOLOR', (2, -1), (-1, -1), colors.HexColor('#E11D48')),
     ]))
     elements.append(items_table)
-    elements.append(Spacer(1, 30))
+    elements.append(Spacer(1, 25))
     
     # Pied de page
     footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#94A3B8'), alignment=TA_CENTER)
+    delivery_style = ParagraphStyle('Delivery', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor('#E11D48'), alignment=TA_CENTER, spaceBefore=10)
+    
+    elements.append(Paragraph("<b>COMMANDE LIVRAISON</b>", delivery_style))
+    elements.append(Paragraph("<font size='14' color='#F59E0B'><b>+269 3320308</b></font>", ParagraphStyle('Phone', alignment=TA_CENTER)))
+    elements.append(Spacer(1, 15))
     elements.append(Paragraph(f"Taux de conversion: 1 EUR = {EUR_TO_KMF} KMF", footer_style))
-    elements.append(Paragraph(f"Facture générée le {invoice_date} | Restaurant Nassib", footer_style))
+    elements.append(Paragraph(f"Facture générée le {invoice_date} | Restaurant Nassib - Comores", footer_style))
     elements.append(Paragraph("Merci de votre visite !", footer_style))
     
     doc.build(elements)
