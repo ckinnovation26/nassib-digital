@@ -667,7 +667,7 @@ export const AdminDashboard = () => {
                     <Input
                       value={userForm.name}
                       onChange={(e) => setUserForm({...userForm, name: e.target.value})}
-                      placeholder="Jean Dupont"
+                      placeholder="Chamsoudine AHMED"
                       data-testid="user-form-name"
                       className="bg-slate-950 border-slate-800 text-slate-50"
                     />
