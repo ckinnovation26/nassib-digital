@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Header
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -17,6 +18,13 @@ from emergentintegrations.payments.stripe.checkout import (
     CheckoutStatusResponse,
     CheckoutSessionRequest
 )
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Table as PDFTable, TableStyle, Paragraph, Spacer
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+import io
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -674,6 +682,120 @@ async def get_dashboard_stats(current_user: Dict = Depends(get_current_user)):
         "today_revenue": round(today_revenue, 2),
         "pending_orders": pending_orders
     }
+
+# Taux de conversion EUR/KMF
+EUR_TO_KMF = 491.96775
+
+def format_currency_pdf(amount_kmf):
+    """Formate le montant en KMF et EUR"""
+    amount_eur = amount_kmf / EUR_TO_KMF
+    return f"{amount_kmf:,.0f} KMF", f"{amount_eur:,.2f} €"
+
+@api_router.get("/orders/{order_id}/invoice")
+async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get_current_user)):
+    """Génère une facture PDF pour une commande"""
+    
+    order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande non trouvée")
+    
+    # Créer le PDF en mémoire
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=24, textColor=colors.HexColor('#E11D48'), alignment=TA_CENTER, spaceAfter=20)
+    header_style = ParagraphStyle('Header', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#64748B'), alignment=TA_CENTER)
+    section_style = ParagraphStyle('Section', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#1E293B'), spaceBefore=15, spaceAfter=10)
+    normal_style = ParagraphStyle('Normal2', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#334155'))
+    
+    elements = []
+    
+    # En-tête
+    elements.append(Paragraph("FACTURE", title_style))
+    elements.append(Paragraph("Restaurant Nassib", header_style))
+    elements.append(Spacer(1, 20))
+    
+    # Infos facture
+    invoice_date = datetime.now().strftime("%d/%m/%Y %H:%M")
+    order_date = order.get("created_at", "")
+    if isinstance(order_date, str):
+        try:
+            order_date = datetime.fromisoformat(order_date).strftime("%d/%m/%Y %H:%M")
+        except:
+            order_date = invoice_date
+    
+    info_data = [
+        ["N° Commande:", order_id[:8].upper(), "Date commande:", str(order_date)],
+        ["Table:", str(order.get("table_number", "N/A")), "Serveur:", order.get("waiter_name", "N/A")],
+        ["Statut paiement:", "PAYÉ" if order.get("payment_status") == "paid" else "NON PAYÉ", "Mode:", order.get("payment_method", "N/A").upper()],
+    ]
+    
+    info_table = PDFTable(info_data, colWidths=[3*cm, 4.5*cm, 3*cm, 4.5*cm])
+    info_table.setStyle(TableStyle([
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#64748B')),
+        ('TEXTCOLOR', (2, 0), (2, -1), colors.HexColor('#64748B')),
+        ('FONTNAME', (1, 0), (1, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (3, 0), (3, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 20))
+    
+    # Détail des articles
+    elements.append(Paragraph("DÉTAIL DE LA COMMANDE", section_style))
+    
+    table_data = [["Article", "Qté", "Prix unit.", "Total KMF", "Total EUR"]]
+    
+    for item in order.get("items", []):
+        name = item.get("menu_item_name", "Article")
+        qty = item.get("quantity", 1)
+        price = item.get("price", 0)
+        total = qty * price
+        kmf, eur = format_currency_pdf(total)
+        price_kmf, price_eur = format_currency_pdf(price)
+        table_data.append([name, str(qty), price_kmf, kmf, eur])
+    
+    # Total
+    total_amount = order.get("total", 0)
+    total_kmf, total_eur = format_currency_pdf(total_amount)
+    table_data.append(["", "", "", "", ""])
+    table_data.append(["", "", "TOTAL:", total_kmf, total_eur])
+    
+    items_table = PDFTable(table_data, colWidths=[6*cm, 1.5*cm, 3*cm, 3*cm, 3*cm])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('LINEBELOW', (0, 0), (-1, 0), 2, colors.HexColor('#E11D48')),
+        ('LINEBELOW', (0, 1), (-1, -3), 0.5, colors.HexColor('#E2E8F0')),
+        ('FONTNAME', (2, -1), (-1, -1), 'Helvetica-Bold'),
+        ('BACKGROUND', (2, -1), (-1, -1), colors.HexColor('#FEF2F2')),
+        ('TEXTCOLOR', (2, -1), (-1, -1), colors.HexColor('#E11D48')),
+    ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 30))
+    
+    # Pied de page
+    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#94A3B8'), alignment=TA_CENTER)
+    elements.append(Paragraph(f"Taux de conversion: 1 EUR = {EUR_TO_KMF} KMF", footer_style))
+    elements.append(Paragraph(f"Facture générée le {invoice_date} | Restaurant Nassib", footer_style))
+    elements.append(Paragraph("Merci de votre visite !", footer_style))
+    
+    doc.build(elements)
+    buffer.seek(0)
+    
+    # Retourner le PDF
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=facture_nassib_{order_id[:8]}.pdf"}
+    )
 
 app.include_router(api_router)
 

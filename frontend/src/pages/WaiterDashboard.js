@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, LogOut, DollarSign, CheckCircle, Clock, Search } from 'lucide-react';
+import { Plus, LogOut, DollarSign, CheckCircle, Clock, Search, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../utils/currency';
 import { Input } from '../components/ui/input';
@@ -488,14 +488,23 @@ export const WaiterDashboard = () => {
                       </Button>
                     )}
                     {order.payment_status === 'paid' && order.status !== 'completed' && (
-                      <Button
-                        onClick={() => markAsCompleted(order.id)}
-                        data-testid={`complete-order-${order.id}`}
-                        className="flex-1 h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-base shadow-lg shadow-emerald-500/30"
-                      >
-                        <CheckCircle className="w-5 h-5 mr-2" />
-                        TERMINER
-                      </Button>
+                      <>
+                        <Button
+                          onClick={() => window.open(`${API}/orders/${order.id}/invoice`, '_blank')}
+                          data-testid={`invoice-${order.id}`}
+                          className="h-12 px-4 bg-slate-700 hover:bg-slate-600 text-white font-bold text-base"
+                        >
+                          <FileText className="w-5 h-5" />
+                        </Button>
+                        <Button
+                          onClick={() => markAsCompleted(order.id)}
+                          data-testid={`complete-order-${order.id}`}
+                          className="flex-1 h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-base shadow-lg shadow-emerald-500/30"
+                        >
+                          <CheckCircle className="w-5 h-5 mr-2" />
+                          TERMINER
+                        </Button>
+                      </>
                     )}
                     {order.status === 'pending' && (
                       <div className="flex-1 h-12 flex items-center justify-center gap-2 text-amber-500 text-sm font-bold bg-amber-500/10 rounded-lg border-2 border-amber-500/30">
