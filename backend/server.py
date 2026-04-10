@@ -12,12 +12,12 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
 import jwt
-from emergentintegrations.payments.stripe.checkout import (
-    StripeCheckout,
-    CheckoutSessionResponse,
-    CheckoutStatusResponse,
-    CheckoutSessionRequest
-)
+# from emergentintegrations.payments.stripe.checkout import (
+#    StripeCheckout,
+#    CheckoutSessionResponse,
+#    CheckoutStatusResponse,
+#    CheckoutSessionRequest
+#)
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
