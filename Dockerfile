@@ -1,5 +1,5 @@
 FROM python:3.11-slim
-
+# Nassib Digital - Backend FastAPI
 WORKDIR /app
 
 COPY backend/requirements.txt .
