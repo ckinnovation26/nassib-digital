@@ -21,6 +21,7 @@ export const WaiterDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
   const [cart, setCart] = useState([]);
+  const [guestsCount, setGuestsCount] = useState(1); // Nombre de couverts
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
@@ -53,8 +54,8 @@ export const WaiterDashboard = () => {
   const addToCart = (item) => {
     const existing = cart.find(c => c.menu_item_id === item.id);
     if (existing) {
-      setCart(cart.map(c => 
-        c.menu_item_id === item.id 
+      setCart(cart.map(c =>
+        c.menu_item_id === item.id
           ? { ...c, quantity: c.quantity + 1 }
           : c
       ));
@@ -90,11 +91,13 @@ export const WaiterDashboard = () => {
     try {
       await axios.post(`${API}/orders`, {
         table_id: selectedTable.id,
-        items: cart
+        items: cart,
+        guests_count: guestsCount  // Envoi du nombre de couverts
       });
       toast.success('Commande créée!');
       setCart([]);
       setSelectedTable(null);
+      setGuestsCount(1);
       setIsOrderDialogOpen(false);
       fetchData();
     } catch (error) {
@@ -130,7 +133,6 @@ export const WaiterDashboard = () => {
 
   const handleCashPayment = async () => {
     if (!selectedOrderForPayment) return;
-
     try {
       await axios.post(`${API}/payment/cash`, {
         order_id: selectedOrderForPayment.id
@@ -155,12 +157,8 @@ export const WaiterDashboard = () => {
       toast.info('Génération de la facture...');
       const response = await axios.get(`${API}/orders/${orderId}/invoice`, {
         responseType: 'blob',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       });
-      
-      // Créer un lien de téléchargement
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
@@ -169,7 +167,6 @@ export const WaiterDashboard = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      
       toast.success('Facture téléchargée !');
     } catch (error) {
       console.error('Erreur téléchargement facture:', error);
@@ -200,6 +197,40 @@ export const WaiterDashboard = () => {
       default: return status;
     }
   };
+
+  // --- TABLE STATUS HELPERS ---
+  const getTableStyle = (table) => {
+    switch (table.status) {
+      case 'free':
+        return 'bg-gradient-to-br from-emerald-900/30 to-slate-900 border-emerald-600/50 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/30 hover:scale-105';
+      case 'partial':
+        return 'bg-gradient-to-br from-amber-900/30 to-slate-900 border-amber-500/50 hover:border-amber-400 hover:shadow-lg hover:shadow-amber-500/30 hover:scale-105';
+      case 'occupied':
+        return 'bg-gradient-to-br from-rose-900/30 to-slate-900 border-rose-600/50 cursor-not-allowed opacity-75';
+      default:
+        return 'bg-gradient-to-br from-rose-900/30 to-slate-900 border-rose-600/50 cursor-not-allowed opacity-75';
+    }
+  };
+
+  const getTableStatusLabel = (table) => {
+    switch (table.status) {
+      case 'free':
+        return <span className="text-emerald-400">✓ Libre</span>;
+      case 'partial':
+        return (
+          <span className="text-amber-400">
+            ◑ Partielle ({table.occupied_seats || 0}/{table.capacity})
+          </span>
+        );
+      case 'occupied':
+        return <span className="text-rose-400">● Occupée</span>;
+      default:
+        return <span className="text-rose-400">● Occupée</span>;
+    }
+  };
+
+  const isTableClickable = (table) => table.status === 'free' || table.status === 'partial';
+  // --- FIN TABLE STATUS HELPERS ---
 
   if (loading) {
     return (
@@ -233,27 +264,25 @@ export const WaiterDashboard = () => {
         <section data-testid="tables-section">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold text-slate-50">Tables</h2>
-            <p className="text-xs text-slate-400">Cliquez sur une table pour commander</p>
+            <div className="flex gap-3 text-xs text-slate-400">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>Libre</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>Partielle</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-400 inline-block"></span>Occupée</span>
+            </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {tables.map(table => (
               <Card
                 key={table.id}
                 data-testid={`table-${table.number}`}
-                onClick={() => table.status === 'free' && openOrderDialog(table)}
-                className={`group relative p-6 cursor-pointer border-2 transition-all duration-300 overflow-hidden ${
-                  table.status === 'free'
-                    ? 'bg-gradient-to-br from-emerald-900/30 to-slate-900 border-emerald-600/50 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/30 hover:scale-105'
-                    : 'bg-gradient-to-br from-rose-900/30 to-slate-900 border-rose-600/50 cursor-not-allowed opacity-75'
-                }`}
+                onClick={() => isTableClickable(table) && openOrderDialog(table)}
+                className={`group relative p-6 border-2 transition-all duration-300 overflow-hidden ${getTableStyle(table)} ${isTableClickable(table) ? 'cursor-pointer' : 'cursor-not-allowed'}`}
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative text-center">
                   <div className="text-4xl font-black text-slate-50 font-mono tracking-wider drop-shadow-lg">{table.number}</div>
-                  <div className={`text-xs font-bold mt-2 uppercase tracking-wide ${
-                    table.status === 'free' ? 'text-emerald-400' : 'text-rose-400'
-                  }`}>
-                    {table.status === 'free' ? '✓ Libre' : '● Occupée'}
+                  <div className="text-xs font-bold mt-2 uppercase tracking-wide">
+                    {getTableStatusLabel(table)}
                   </div>
                   <div className="text-xs text-slate-500 mt-1">{table.capacity} pers.</div>
                 </div>
@@ -270,6 +299,7 @@ export const WaiterDashboard = () => {
               if (!open) {
                 setSelectedTable(null);
                 setCart([]);
+                setGuestsCount(1);
                 setSearchQuery('');
               }
             }}>
@@ -279,6 +309,7 @@ export const WaiterDashboard = () => {
                   onClick={() => {
                     setSelectedTable(null);
                     setCart([]);
+                    setGuestsCount(1);
                   }}
                   className="h-12 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-lg shadow-xl shadow-rose-500/40 transition-all hover:scale-105"
                 >
@@ -292,6 +323,8 @@ export const WaiterDashboard = () => {
                   <DialogDescription className="text-slate-400">Sélectionnez une table et ajoutez des items</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
+
+                  {/* Sélection table */}
                   <div>
                     <label className="text-sm text-slate-300 mb-2 block font-semibold">
                       Table {selectedTable ? `✓ ${selectedTable.number} sélectionnée` : '⚠️ SÉLECTIONNEZ UNE TABLE'}
@@ -299,23 +332,69 @@ export const WaiterDashboard = () => {
                     <select
                       data-testid="table-select"
                       className={`w-full border rounded-md px-3 py-3 text-base font-medium ${
-                        selectedTable 
-                          ? 'bg-emerald-900/30 border-emerald-600 text-emerald-300' 
+                        selectedTable
+                          ? 'bg-emerald-900/30 border-emerald-600 text-emerald-300'
                           : 'bg-rose-900/30 border-rose-600 text-rose-300 animate-pulse'
                       }`}
                       value={selectedTable?.id || ''}
-                      onChange={(e) => setSelectedTable(tables.find(t => t.id === e.target.value))}
+                      onChange={(e) => {
+                        const t = tables.find(t => t.id === e.target.value);
+                        setSelectedTable(t);
+                        // Réinitialiser guests_count selon capacité restante
+                        if (t) {
+                          const remaining = t.capacity - (t.occupied_seats || 0);
+                          setGuestsCount(Math.max(1, Math.min(1, remaining)));
+                        }
+                      }}
                     >
                       <option value="">⚠️ Sélectionner une table</option>
-                      {tables.filter(t => t.status === 'free').map(table => (
-                        <option key={table.id} value={table.id}>Table {table.number} ({table.capacity} pers.)</option>
+                      {tables.filter(t => t.status === 'free' || t.status === 'partial').map(table => (
+                        <option key={table.id} value={table.id}>
+                          Table {table.number} ({table.capacity} pers.
+                          {table.status === 'partial' ? ` — ${table.capacity - (table.occupied_seats || 0)} places libres` : ''})
+                        </option>
                       ))}
                     </select>
                   </div>
 
+                  {/* Nombre de couverts */}
+                  {selectedTable && (
+                    <div>
+                      <label className="text-sm text-slate-300 mb-2 block font-semibold">
+                        Nombre de couverts
+                        {selectedTable.status === 'partial' && (
+                          <span className="ml-2 text-amber-400 font-normal">
+                            (max {selectedTable.capacity - (selectedTable.occupied_seats || 0)} places restantes)
+                          </span>
+                        )}
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setGuestsCount(Math.max(1, guestsCount - 1))}
+                          className="w-10 h-10 text-xl text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg"
+                        >−</Button>
+                        <span className="text-2xl font-black text-slate-50 w-8 text-center">{guestsCount}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => {
+                            const maxSeats = selectedTable.capacity - (selectedTable.occupied_seats || 0);
+                            setGuestsCount(Math.min(guestsCount + 1, maxSeats));
+                          }}
+                          className="w-10 h-10 text-xl text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg"
+                        >+</Button>
+                        <span className="text-xs text-slate-500 ml-1">
+                          sur {selectedTable.capacity} places
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Menu */}
                   <div>
                     <label className="text-sm text-slate-300 mb-2 block">Menu</label>
-                    {/* Barre de recherche */}
                     <div className="relative mb-3">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <Input
@@ -330,9 +409,7 @@ export const WaiterDashboard = () => {
                         <button
                           onClick={() => setSearchQuery('')}
                           className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-rose-400"
-                        >
-                          ✕
-                        </button>
+                        >✕</button>
                       )}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2" data-testid="menu-items">
@@ -348,37 +425,34 @@ export const WaiterDashboard = () => {
                           );
                         })
                         .map(item => (
-                        <Card
-                          key={item.id}
-                          data-testid={`menu-item-${item.id}`}
-                          onClick={() => addToCart(item)}
-                          className="group relative overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-700 hover:border-rose-500 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-rose-500/20"
-                        >
-                          {item.image_url && (
-                            <div className="h-32 overflow-hidden">
-                              <img 
-                                src={item.image_url} 
-                                alt={item.name}
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                              />
+                          <Card
+                            key={item.id}
+                            data-testid={`menu-item-${item.id}`}
+                            onClick={() => addToCart(item)}
+                            className="group relative overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-700 hover:border-rose-500 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-rose-500/20"
+                          >
+                            {item.image_url && (
+                              <div className="h-32 overflow-hidden">
+                                <img
+                                  src={item.image_url}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                />
+                              </div>
+                            )}
+                            <div className="p-3">
+                              <div className="text-base font-bold text-slate-50 group-hover:text-rose-400 transition-colors">{item.name}</div>
+                              <div className="text-xs text-slate-400 mt-1 line-clamp-2">{item.description}</div>
+                              <div className="flex items-center justify-between mt-3">
+                                <span className="inline-block px-2 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-md font-medium">{item.category}</span>
+                                <span className="text-lg font-black text-rose-500 font-mono">{formatCurrency(item.price)}</span>
+                              </div>
                             </div>
-                          )}
-                          <div className="p-3">
-                            <div className="text-base font-bold text-slate-50 group-hover:text-rose-400 transition-colors">{item.name}</div>
-                            <div className="text-xs text-slate-400 mt-1 line-clamp-2">{item.description}</div>
-                            <div className="flex items-center justify-between mt-3">
-                              <span className="inline-block px-2 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-md font-medium">
-                                {item.category}
-                              </span>
-                              <span className="text-lg font-black text-rose-500 font-mono">{formatCurrency(item.price)}</span>
+                            <div className="absolute top-2 right-2 w-8 h-8 bg-rose-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Plus className="w-5 h-5 text-white" />
                             </div>
-                          </div>
-                          <div className="absolute top-2 right-2 w-8 h-8 bg-rose-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Plus className="w-5 h-5 text-white" />
-                          </div>
-                        </Card>
-                      ))}
-                      {/* Message si aucun résultat */}
+                          </Card>
+                        ))}
                       {searchQuery && menuItems.filter(item => item.available).filter(item => {
                         const query = searchQuery.toLowerCase();
                         return (
@@ -390,17 +464,16 @@ export const WaiterDashboard = () => {
                         <div className="col-span-2 text-center py-8 text-slate-400">
                           <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
                           <p>Aucun plat trouvé pour "{searchQuery}"</p>
-                          <button 
+                          <button
                             onClick={() => setSearchQuery('')}
                             className="mt-2 text-rose-400 hover:text-rose-300 text-sm underline"
-                          >
-                            Effacer la recherche
-                          </button>
+                          >Effacer la recherche</button>
                         </div>
                       )}
                     </div>
                   </div>
 
+                  {/* Panier */}
                   {cart.length > 0 && (
                     <div>
                       <label className="text-sm text-slate-300 mb-2 block">Panier</label>
@@ -417,9 +490,7 @@ export const WaiterDashboard = () => {
                                 variant="ghost"
                                 onClick={() => removeFromCart(item.menu_item_id)}
                                 className="text-rose-600 hover:text-rose-700 h-6 px-2"
-                              >
-                                ✕
-                              </Button>
+                              >✕</Button>
                             </div>
                           </div>
                         ))}
@@ -449,11 +520,11 @@ export const WaiterDashboard = () => {
                     }`}
                     disabled={!selectedTable || cart.length === 0}
                   >
-                    {!selectedTable 
-                      ? '⚠️ SÉLECTIONNEZ UNE TABLE' 
-                      : cart.length === 0 
-                        ? '⚠️ AJOUTEZ DES ITEMS' 
-                        : '✓ CRÉER LA COMMANDE'}
+                    {!selectedTable
+                      ? '⚠️ SÉLECTIONNEZ UNE TABLE'
+                      : cart.length === 0
+                        ? '⚠️ AJOUTEZ DES ITEMS'
+                        : `✓ CRÉER LA COMMANDE (${guestsCount} couvert${guestsCount > 1 ? 's' : ''})`}
                   </Button>
                 </div>
               </DialogContent>
@@ -473,7 +544,12 @@ export const WaiterDashboard = () => {
                           {getStatusLabel(order.status)}
                         </span>
                       </div>
-                      <div className="text-xs text-slate-500 mt-1">#{order.id.slice(0, 8)}</div>
+                      <div className="text-xs text-slate-500 mt-1">
+                        #{order.id.slice(0, 8)}
+                        {order.guests_count > 0 && (
+                          <span className="ml-2 text-amber-400">· {order.guests_count} couvert{order.guests_count > 1 ? 's' : ''}</span>
+                        )}
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="text-3xl font-black font-mono bg-gradient-to-r from-rose-500 to-amber-500 bg-clip-text text-transparent">
@@ -552,7 +628,7 @@ export const WaiterDashboard = () => {
           </div>
         </section>
 
-        {/* Dialog choix de paiement */}
+        {/* Dialog paiement */}
         <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
           <DialogContent className="max-w-md bg-slate-900 border-slate-800" data-testid="payment-choice-dialog">
             <DialogHeader>
