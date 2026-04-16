@@ -25,33 +25,33 @@ from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table as PDFTable, TableStyle, Paragraph, Spacer
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 import io
-
+ 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
-
+ 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
-
+ 
 JWT_SECRET = os.environ.get('JWT_SECRET')
 JWT_ALGORITHM = os.environ.get('JWT_ALGORITHM', 'HS256')
 JWT_EXPIRATION = int(os.environ.get('JWT_EXPIRATION_HOURS', 168))
-
+ 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+ 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
-
+ 
 class UserRegister(BaseModel):
     email: EmailStr
     password: str
     name: str
     role: str = "waiter"
-
+ 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
-
+ 
 class User(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -59,7 +59,7 @@ class User(BaseModel):
     name: str
     role: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
+ 
 class MenuItem(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -69,9 +69,9 @@ class MenuItem(BaseModel):
     category: str
     image_url: Optional[str] = None
     available: bool = True
-    preparation_time: int = 15  # Temps de préparation en minutes (défini par l'admin)
+    preparation_time: int = 15
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
+ 
 class MenuItemCreate(BaseModel):
     name: str
     description: str
@@ -79,31 +79,32 @@ class MenuItemCreate(BaseModel):
     category: str
     image_url: Optional[str] = None
     available: bool = True
-    preparation_time: int = 15  # Temps de préparation en minutes
-
+    preparation_time: int = 15
+ 
 class Table(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     number: int
     capacity: int
     status: str = "free"
+    occupied_seats: int = 0  # Nombre de places occupées
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
+ 
 class TableCreate(BaseModel):
     number: int
     capacity: int
-
+ 
 class TableUpdate(BaseModel):
     status: str
-
+ 
 class OrderItem(BaseModel):
     menu_item_id: str
     menu_item_name: str
     quantity: int
     price: float
     notes: Optional[str] = None
-    preparation_time: int = 15  # Temps de préparation en minutes
-
+    preparation_time: int = 15
+ 
 class Order(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -114,20 +115,22 @@ class Order(BaseModel):
     items: List[OrderItem]
     total: float
     status: str = "pending"
+    guests_count: int = 1  # Nombre de couverts pour cette commande
     payment_status: str = "unpaid"
     payment_method: Optional[str] = None  # "cash" ou "card"
-    preparation_started_at: Optional[str] = None  # Heure de début de préparation
-    estimated_preparation_time: int = 15  # Temps de préparation max en minutes
+    preparation_started_at: Optional[str] = None
+    estimated_preparation_time: int = 15
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
+ 
 class OrderCreate(BaseModel):
     table_id: str
     items: List[OrderItem]
-
+    guests_count: int = 1  # Nombre de couverts (places occupées par ce groupe)
+ 
 class OrderStatusUpdate(BaseModel):
     status: str
-
+ 
 class PaymentTransaction(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -139,7 +142,7 @@ class PaymentTransaction(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
+ 
 def create_token(user_id: str, email: str, role: str) -> str:
     payload = {
         "user_id": user_id,
@@ -148,7 +151,7 @@ def create_token(user_id: str, email: str, role: str) -> str:
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
+ 
 async def get_current_user(authorization: str = Header(None)) -> Dict[str, Any]:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Non authentifié")
@@ -161,7 +164,7 @@ async def get_current_user(authorization: str = Header(None)) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Token expiré")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token invalide")
-
+ 
 @api_router.post("/auth/register")
 async def register(user_data: UserRegister):
     existing = await db.users.find_one({"email": user_data.email}, {"_id": 0})
@@ -182,7 +185,7 @@ async def register(user_data: UserRegister):
     
     token = create_token(user.id, user.email, user.role)
     return {"user": user.model_dump(), "token": token}
-
+ 
 @api_router.post("/auth/login")
 async def login(credentials: UserLogin):
     user_doc = await db.users.find_one({"email": credentials.email}, {"_id": 0})
@@ -199,7 +202,7 @@ async def login(credentials: UserLogin):
         user_doc["created_at"] = datetime.fromisoformat(user_doc["created_at"])
     
     return {"user": user_doc, "token": token}
-
+ 
 @api_router.get("/auth/me")
 async def get_me(current_user: Dict = Depends(get_current_user)):
     user_doc = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0, "password_hash": 0})
@@ -210,7 +213,7 @@ async def get_me(current_user: Dict = Depends(get_current_user)):
         user_doc["created_at"] = datetime.fromisoformat(user_doc["created_at"])
     
     return user_doc
-
+ 
 @api_router.get("/menu", response_model=List[MenuItem])
 async def get_menu(category: Optional[str] = None):
     query = {}
@@ -222,7 +225,7 @@ async def get_menu(category: Optional[str] = None):
         if isinstance(item.get("created_at"), str):
             item["created_at"] = datetime.fromisoformat(item["created_at"])
     return items
-
+ 
 @api_router.post("/menu", response_model=MenuItem)
 async def create_menu_item(item_data: MenuItemCreate, current_user: Dict = Depends(get_current_user)):
     if current_user["role"] not in ["admin", "accountant"]:
@@ -234,7 +237,7 @@ async def create_menu_item(item_data: MenuItemCreate, current_user: Dict = Depen
     
     await db.menu_items.insert_one(item_dict)
     return item
-
+ 
 @api_router.put("/menu/{item_id}", response_model=MenuItem)
 async def update_menu_item(item_id: str, item_data: MenuItemCreate, current_user: Dict = Depends(get_current_user)):
     if current_user["role"] not in ["admin", "accountant"]:
@@ -251,7 +254,7 @@ async def update_menu_item(item_id: str, item_data: MenuItemCreate, current_user
         updated["created_at"] = datetime.fromisoformat(updated["created_at"])
     
     return updated
-
+ 
 @api_router.delete("/menu/{item_id}")
 async def delete_menu_item(item_id: str, current_user: Dict = Depends(get_current_user)):
     if current_user["role"] not in ["admin", "accountant"]:
@@ -262,7 +265,7 @@ async def delete_menu_item(item_id: str, current_user: Dict = Depends(get_curren
         raise HTTPException(status_code=404, detail="Item non trouvé")
     
     return {"message": "Item supprimé"}
-
+ 
 @api_router.get("/tables", response_model=List[Table])
 async def get_tables():
     tables = await db.tables.find({}, {"_id": 0}).to_list(1000)
@@ -270,7 +273,7 @@ async def get_tables():
         if isinstance(table.get("created_at"), str):
             table["created_at"] = datetime.fromisoformat(table["created_at"])
     return tables
-
+ 
 @api_router.post("/tables", response_model=Table)
 async def create_table(table_data: TableCreate, current_user: Dict = Depends(get_current_user)):
     if current_user["role"] not in ["admin", "accountant"]:
@@ -286,7 +289,7 @@ async def create_table(table_data: TableCreate, current_user: Dict = Depends(get
     
     await db.tables.insert_one(table_dict)
     return table
-
+ 
 @api_router.put("/tables/{table_id}", response_model=Table)
 async def update_table(table_id: str, table_data: TableUpdate):
     result = await db.tables.update_one({"id": table_id}, {"$set": {"status": table_data.status}})
@@ -299,13 +302,12 @@ async def update_table(table_id: str, table_data: TableUpdate):
         updated["created_at"] = datetime.fromisoformat(updated["created_at"])
     
     return updated
-
+ 
 @api_router.delete("/tables/{table_id}")
 async def delete_table(table_id: str, current_user: Dict = Depends(get_current_user)):
     if current_user["role"] not in ["admin"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
     
-    # Vérifier si la table a des commandes actives
     active_orders = await db.orders.count_documents({
         "table_id": table_id,
         "status": {"$nin": ["completed", "cancelled"]}
@@ -318,7 +320,7 @@ async def delete_table(table_id: str, current_user: Dict = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Table non trouvée")
     
     return {"message": "Table supprimée"}
-
+ 
 @api_router.get("/users", response_model=List[User])
 async def get_users(current_user: Dict = Depends(get_current_user)):
     if current_user["role"] != "admin":
@@ -329,13 +331,12 @@ async def get_users(current_user: Dict = Depends(get_current_user)):
         if isinstance(user.get("created_at"), str):
             user["created_at"] = datetime.fromisoformat(user["created_at"])
     return users
-
+ 
 @api_router.delete("/users/{user_id}")
 async def delete_user(user_id: str, current_user: Dict = Depends(get_current_user)):
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Accès refusé")
     
-    # Empêcher l'auto-suppression
     if user_id == current_user["user_id"]:
         raise HTTPException(status_code=400, detail="Vous ne pouvez pas supprimer votre propre compte")
     
@@ -344,7 +345,7 @@ async def delete_user(user_id: str, current_user: Dict = Depends(get_current_use
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     
     return {"message": "Utilisateur supprimé"}
-
+ 
 @api_router.put("/users/{user_id}")
 async def update_user(user_id: str, user_data: dict, current_user: Dict = Depends(get_current_user)):
     if current_user["role"] != "admin":
@@ -367,7 +368,7 @@ async def update_user(user_id: str, user_data: dict, current_user: Dict = Depend
     
     updated = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
     return updated
-
+ 
 @api_router.post("/orders", response_model=Order)
 async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get_current_user)):
     table = await db.tables.find_one({"id": order_data.table_id}, {"_id": 0})
@@ -376,13 +377,11 @@ async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get
     
     total = sum(item.quantity * item.price for item in order_data.items)
     
-    # Récupérer les temps de préparation des plats et calculer le temps max
-    max_prep_time = 15  # Valeur par défaut
+    max_prep_time = 15
     items_with_prep_time = []
     
     for item in order_data.items:
         item_dict = item.model_dump()
-        # Chercher le temps de préparation dans le menu
         menu_item = await db.menu_items.find_one({"id": item.menu_item_id}, {"_id": 0})
         if menu_item:
             prep_time = menu_item.get("preparation_time", 15)
@@ -400,6 +399,7 @@ async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get
         waiter_name=current_user.get("email", "Unknown"),
         items=items_with_prep_time,
         total=total,
+        guests_count=order_data.guests_count,
         estimated_preparation_time=max_prep_time
     )
     
@@ -408,10 +408,26 @@ async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get
     order_dict["updated_at"] = order_dict["updated_at"].isoformat()
     
     await db.orders.insert_one(order_dict)
-    await db.tables.update_one({"id": order_data.table_id}, {"$set": {"status": "occupied"}})
-    
+ 
+    # --- FIX TABLES PARTIELLES ---
+    # Calculer les sièges occupés et déterminer le statut correct
+    new_occupied = table.get("occupied_seats", 0) + order_data.guests_count
+    # Plafonner au max de la capacité
+    new_occupied = min(new_occupied, table["capacity"])
+    if new_occupied >= table["capacity"]:
+        new_status = "occupied"
+    elif new_occupied > 0:
+        new_status = "partial"
+    else:
+        new_status = "free"
+    await db.tables.update_one(
+        {"id": order_data.table_id},
+        {"$set": {"status": new_status, "occupied_seats": new_occupied}}
+    )
+    # --- FIN FIX ---
+ 
     return order
-
+ 
 @api_router.get("/orders", response_model=List[Order])
 async def get_orders(status: Optional[str] = None, table_id: Optional[str] = None):
     query = {}
@@ -427,7 +443,7 @@ async def get_orders(status: Optional[str] = None, table_id: Optional[str] = Non
         if isinstance(order.get("updated_at"), str):
             order["updated_at"] = datetime.fromisoformat(order["updated_at"])
     return orders
-
+ 
 @api_router.get("/orders/{order_id}", response_model=Order)
 async def get_order(order_id: str):
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
@@ -440,7 +456,7 @@ async def get_order(order_id: str):
         order["updated_at"] = datetime.fromisoformat(order["updated_at"])
     
     return order
-
+ 
 @api_router.put("/orders/{order_id}/status", response_model=Order)
 async def update_order_status(order_id: str, status_data: OrderStatusUpdate):
     update_data = {
@@ -448,7 +464,6 @@ async def update_order_status(order_id: str, status_data: OrderStatusUpdate):
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
-    # Si on passe en préparation, enregistrer l'heure de début
     if status_data.status == "in_progress":
         update_data["preparation_started_at"] = datetime.now(timezone.utc).isoformat()
     
@@ -463,16 +478,30 @@ async def update_order_status(order_id: str, status_data: OrderStatusUpdate):
     if isinstance(order.get("updated_at"), str):
         order["updated_at"] = datetime.fromisoformat(order["updated_at"])
     
-    # La table se libère seulement quand la commande est terminée (completed)
-    if status_data.status == "completed":
-        await db.tables.update_one({"id": order["table_id"]}, {"$set": {"status": "free"}})
-    
+    # --- FIX TABLES PARTIELLES : libération progressive ---
+    if status_data.status in ["completed", "cancelled"]:
+        table_doc = await db.tables.find_one({"id": order["table_id"]}, {"_id": 0})
+        if table_doc:
+            guests = order.get("guests_count", 1)
+            new_occupied = max(0, table_doc.get("occupied_seats", 0) - guests)
+            if new_occupied == 0:
+                new_status = "free"
+            elif new_occupied >= table_doc["capacity"]:
+                new_status = "occupied"
+            else:
+                new_status = "partial"
+            await db.tables.update_one(
+                {"id": order["table_id"]},
+                {"$set": {"status": new_status, "occupied_seats": new_occupied}}
+            )
+    # --- FIN FIX ---
+ 
     return order
-
+ 
 class CheckoutRequest(BaseModel):
     order_id: str
     origin_url: str
-
+ 
 @api_router.post("/checkout/session")
 async def create_checkout_session(checkout_req: CheckoutRequest, current_user: Dict = Depends(get_current_user)):
     order = await db.orders.find_one({"id": checkout_req.order_id}, {"_id": 0})
@@ -482,11 +511,9 @@ async def create_checkout_session(checkout_req: CheckoutRequest, current_user: D
     if order["payment_status"] == "paid":
         raise HTTPException(status_code=400, detail="Commande déjà payée")
     
-    # Conversion KMF → EUR (1 EUR = 491.96775 KMF)
     amount_kmf = float(order["total"])
     amount_eur = round(amount_kmf / 491.96775, 2)
     
-    # Vérifier le montant minimum de Stripe (0.50 EUR)
     if amount_eur < 0.50:
         min_kmf = round(0.50 * 491.96775, 0)
         raise HTTPException(
@@ -534,14 +561,13 @@ async def create_checkout_session(checkout_req: CheckoutRequest, current_user: D
     
     await db.payment_transactions.insert_one(transaction_dict)
     
-    # Marquer la méthode de paiement
     await db.orders.update_one(
         {"id": checkout_req.order_id},
         {"$set": {"payment_method": "card"}}
     )
     
     return {"url": session.url, "session_id": session.session_id}
-
+ 
 @api_router.get("/checkout/status/{session_id}")
 async def get_checkout_status(session_id: str):
     stripe_api_key = os.environ.get("STRIPE_API_KEY")
@@ -573,7 +599,7 @@ async def get_checkout_status(session_id: str):
         "amount_total": checkout_status.amount_total,
         "currency": checkout_status.currency
     }
-
+ 
 @api_router.post("/webhook/stripe")
 async def stripe_webhook(request: Request):
     body = await request.body()
@@ -603,10 +629,10 @@ async def stripe_webhook(request: Request):
         return {"received": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
+ 
 class CashPaymentRequest(BaseModel):
     order_id: str
-
+ 
 @api_router.post("/payment/cash")
 async def process_cash_payment(payment_req: CashPaymentRequest, current_user: Dict = Depends(get_current_user)):
     order = await db.orders.find_one({"id": payment_req.order_id}, {"_id": 0})
@@ -616,7 +642,6 @@ async def process_cash_payment(payment_req: CashPaymentRequest, current_user: Di
     if order["payment_status"] == "paid":
         raise HTTPException(status_code=400, detail="Commande déjà payée")
     
-    # Marquer comme payé en cash
     await db.orders.update_one(
         {"id": payment_req.order_id},
         {"$set": {
@@ -626,7 +651,6 @@ async def process_cash_payment(payment_req: CashPaymentRequest, current_user: Di
         }}
     )
     
-    # Créer une transaction cash pour les records
     transaction = PaymentTransaction(
         order_id=payment_req.order_id,
         amount=float(order["total"]),
@@ -643,7 +667,7 @@ async def process_cash_payment(payment_req: CashPaymentRequest, current_user: Di
     await db.payment_transactions.insert_one(transaction_dict)
     
     return {"success": True, "message": "Paiement cash enregistré", "order_id": payment_req.order_id}
-
+ 
 @api_router.get("/stats/dashboard")
 async def get_dashboard_stats(current_user: Dict = Depends(get_current_user)):
     if current_user["role"] not in ["admin", "accountant"]:
@@ -682,15 +706,14 @@ async def get_dashboard_stats(current_user: Dict = Depends(get_current_user)):
         "today_revenue": round(today_revenue, 2),
         "pending_orders": pending_orders
     }
-
-# Taux de conversion EUR/KMF
+ 
 EUR_TO_KMF = 491.96775
-
+ 
 def format_currency_pdf(amount_kmf):
     """Formate le montant en KMF et EUR"""
     amount_eur = amount_kmf / EUR_TO_KMF
     return f"{amount_kmf:,.0f} KMF", f"{amount_eur:,.2f} €"
-
+ 
 @api_router.get("/orders/{order_id}/invoice")
 async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get_current_user)):
     """Génère une facture PDF pour une commande"""
@@ -699,7 +722,6 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     if not order:
         raise HTTPException(status_code=404, detail="Commande non trouvée")
     
-    # Créer le PDF en mémoire
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=1.5*cm, bottomMargin=2*cm)
     
@@ -712,7 +734,6 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     
     elements = []
     
-    # Logo Nassib (téléchargé depuis l'URL)
     logo_url = "https://customer-assets.emergentagent.com/job_nassib-digital/artifacts/et6rs79p_IMG_9019.jpeg"
     try:
         import urllib.request
@@ -721,15 +742,13 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
         logo = PDFImage(logo_data, width=3*cm, height=3*cm)
         elements.append(logo)
     except Exception as e:
-        pass  # Si le logo ne charge pas, on continue sans
+        pass
     
-    # En-tête
     elements.append(Paragraph("FACTURE", title_style))
     elements.append(Paragraph("Restaurant Nassib - Comores", header_style))
     elements.append(Paragraph("<b>Livraison : +269 3320308</b>", contact_style))
     elements.append(Spacer(1, 15))
     
-    # Infos facture
     invoice_date = datetime.now().strftime("%d/%m/%Y %H:%M")
     order_date = order.get("created_at", "")
     if isinstance(order_date, str):
@@ -756,7 +775,6 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     elements.append(info_table)
     elements.append(Spacer(1, 20))
     
-    # Détail des articles
     elements.append(Paragraph("DÉTAIL DE LA COMMANDE", section_style))
     
     table_data = [["Article", "Qté", "Prix unit.", "Total KMF", "Total EUR"]]
@@ -770,7 +788,6 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
         price_kmf, price_eur = format_currency_pdf(price)
         table_data.append([name, str(qty), price_kmf, kmf, eur])
     
-    # Total
     total_amount = order.get("total", 0)
     total_kmf, total_eur = format_currency_pdf(total_amount)
     table_data.append(["", "", "", "", ""])
@@ -794,7 +811,6 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     elements.append(items_table)
     elements.append(Spacer(1, 25))
     
-    # Pied de page
     footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#94A3B8'), alignment=TA_CENTER)
     delivery_style = ParagraphStyle('Delivery', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor('#E11D48'), alignment=TA_CENTER, spaceBefore=10)
     
@@ -808,15 +824,14 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     doc.build(elements)
     buffer.seek(0)
     
-    # Retourner le PDF
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=facture_nassib_{order_id[:8]}.pdf"}
     )
-
+ 
 app.include_router(api_router)
-
+ 
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -824,13 +839,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+ 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
+ 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
