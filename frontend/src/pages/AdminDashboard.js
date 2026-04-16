@@ -18,7 +18,6 @@ export const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('menu');
   const [loading, setLoading] = useState(true);
   
-  // États pour le menu
   const [menuItems, setMenuItems] = useState([]);
   const [isMenuDialogOpen, setIsMenuDialogOpen] = useState(false);
   const [editingMenuItem, setEditingMenuItem] = useState(null);
@@ -31,16 +30,14 @@ export const AdminDashboard = () => {
     preparation_time: 15
   });
   
-  // États pour les tables
   const [tables, setTables] = useState([]);
   const [isTableDialogOpen, setIsTableDialogOpen] = useState(false);
   const [editingTable, setEditingTable] = useState(null);
   const [tableForm, setTableForm] = useState({
-    number: '',
+    number: 1,
     capacity: 4
   });
   
-  // États pour les utilisateurs
   const [users, setUsers] = useState([]);
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -145,7 +142,7 @@ export const AdminDashboard = () => {
     } else {
       setEditingTable(null);
       setTableForm({
-        number: '',
+        number: 1,
         capacity: 4
       });
     }
@@ -153,14 +150,18 @@ export const AdminDashboard = () => {
   };
 
   const saveTable = async () => {
+    const number = parseInt(tableForm.number, 10);
+    const capacity = parseInt(tableForm.capacity, 10);
+
+    if (isNaN(number) || isNaN(capacity) || number < 1 || capacity < 1) {
+      toast.error('Numéro et capacité doivent être des nombres valides');
+      return;
+    }
+
     try {
-      const data = {
-        number: parseInt(tableForm.number),
-        capacity: parseInt(tableForm.capacity)
-      };
+      const data = { number, capacity };
       
       if (editingTable) {
-        // Pour l'édition, on ne peut pas changer le numéro
         toast.info('La modification de table n\'est pas encore supportée');
       } else {
         await axios.post(`${API}/tables`, data, authHeaders);
@@ -272,7 +273,6 @@ export const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 chiromani-pattern" data-testid="admin-dashboard">
-      {/* Header */}
       <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b-2 border-rose-600/50 shadow-lg p-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-4">
@@ -299,7 +299,6 @@ export const AdminDashboard = () => {
       </header>
 
       <main className="max-w-7xl mx-auto p-6">
-        {/* Onglets */}
         <div className="flex gap-2 mb-6">
           <Button
             onClick={() => setActiveTab('menu')}
@@ -405,7 +404,6 @@ export const AdminDashboard = () => {
               </div>
             )}
 
-            {/* Dialog Menu */}
             <Dialog open={isMenuDialogOpen} onOpenChange={setIsMenuDialogOpen}>
               <DialogContent className="max-w-2xl bg-slate-900 border-slate-800">
                 <DialogHeader>
@@ -516,9 +514,11 @@ export const AdminDashboard = () => {
                     <div className="text-3xl font-black text-slate-50 font-mono">{table.number}</div>
                     <div className="text-sm text-slate-400 mt-1">{table.capacity} personnes</div>
                     <div className={`text-xs font-bold mt-2 ${
-                      table.status === 'free' ? 'text-emerald-400' : 'text-rose-400'
+                      table.status === 'free' ? 'text-emerald-400' :
+                      table.status === 'partial' ? 'text-amber-400' : 'text-rose-400'
                     }`}>
-                      {table.status === 'free' ? 'Libre' : 'Occupée'}
+                      {table.status === 'free' ? 'Libre' :
+                       table.status === 'partial' ? `Partielle (${table.occupied_seats}/${table.capacity})` : 'Occupée'}
                     </div>
                   </div>
                   <div className="flex gap-1">
@@ -541,7 +541,6 @@ export const AdminDashboard = () => {
               </div>
             )}
 
-            {/* Dialog Table */}
             <Dialog open={isTableDialogOpen} onOpenChange={setIsTableDialogOpen}>
               <DialogContent className="bg-slate-900 border-slate-800">
                 <DialogHeader>
@@ -558,9 +557,9 @@ export const AdminDashboard = () => {
                     <Label className="text-slate-300">Numéro de table</Label>
                     <Input
                       type="number"
+                      min="1"
                       value={tableForm.number}
                       onChange={(e) => setTableForm({...tableForm, number: e.target.value})}
-                      placeholder="1"
                       data-testid="table-form-number"
                       className="bg-slate-950 border-slate-800 text-slate-50"
                     />
@@ -569,9 +568,9 @@ export const AdminDashboard = () => {
                     <Label className="text-slate-300">Capacité (personnes)</Label>
                     <Input
                       type="number"
+                      min="1"
                       value={tableForm.capacity}
                       onChange={(e) => setTableForm({...tableForm, capacity: e.target.value})}
-                      placeholder="4"
                       data-testid="table-form-capacity"
                       className="bg-slate-950 border-slate-800 text-slate-50"
                     />
@@ -649,7 +648,6 @@ export const AdminDashboard = () => {
               </div>
             )}
 
-            {/* Dialog Utilisateur */}
             <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
               <DialogContent className="bg-slate-900 border-slate-800">
                 <DialogHeader>
