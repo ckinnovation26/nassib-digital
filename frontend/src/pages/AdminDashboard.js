@@ -186,7 +186,7 @@ export const AdminDashboard = () => {
         await axios.put(`${API}/users/${editingUser.id}`, updateData, authHeaders);
         toast.success('Utilisateur modifié !');
       } else {
-        await axios.post(`${API}/auth/register`, userForm);
+        await axios.post(`${API}/auth/register`, userForm, authHeaders);
         toast.success('Utilisateur créé !');
       }
       setIsUserDialogOpen(false);
@@ -200,8 +200,23 @@ export const AdminDashboard = () => {
     catch (error) { toast.error(error.response?.data?.detail || 'Erreur suppression'); }
   };
 
-  const getRoleLabel = (role) => ({ waiter: 'Serveur', chef: 'Cuisinier', accountant: 'Comptable', admin: 'Administrateur' }[role] || role);
-  const getRoleColor = (role) => ({ waiter: 'bg-blue-500/20 text-blue-400', chef: 'bg-amber-500/20 text-amber-400', accountant: 'bg-emerald-500/20 text-emerald-400', admin: 'bg-rose-500/20 text-rose-400' }[role] || 'bg-slate-500/20 text-slate-400');
+  // Rôles : cook (pas chef) pour cohérence backend + cashier ajouté
+  const getRoleLabel = (role) => ({
+    waiter: 'Serveur',
+    cook: 'Cuisinier',
+    accountant: 'Comptable',
+    admin: 'Administrateur',
+    cashier: 'Caissier'
+  }[role] || role);
+
+  const getRoleColor = (role) => ({
+    waiter: 'bg-blue-500/20 text-blue-400',
+    cook: 'bg-amber-500/20 text-amber-400',
+    accountant: 'bg-emerald-500/20 text-emerald-400',
+    admin: 'bg-rose-500/20 text-rose-400',
+    cashier: 'bg-purple-500/20 text-purple-400'
+  }[role] || 'bg-slate-500/20 text-slate-400');
+
   const categories = ['Plats', 'Entrées Froides', 'Entrées Chaudes', 'Poissons', 'Fruits de mer', 'Viandes', 'Volailles', 'Pizzas', 'Desserts', 'Boissons', 'Accompagnements'];
 
   if (loading) return (
@@ -458,8 +473,9 @@ export const AdminDashboard = () => {
                     <Label className="text-slate-300">Rôle</Label>
                     <select value={userForm.role} onChange={(e) => setUserForm({...userForm, role: e.target.value})} className="w-full bg-slate-950 border border-slate-800 text-slate-50 rounded-md px-3 py-2">
                       <option value="waiter">Serveur</option>
-                      <option value="chef">Cuisinier</option>
+                      <option value="cook">Cuisinier</option>
                       <option value="accountant">Comptable</option>
+                      <option value="cashier">Caissier</option>
                       <option value="admin">Administrateur</option>
                     </select>
                   </div>
