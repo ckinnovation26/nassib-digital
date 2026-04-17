@@ -12,13 +12,14 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
 import jwt
+import csv
+import io
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table as PDFTable, TableStyle, Paragraph, Spacer
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
-import io
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -36,7 +37,6 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
-# Rôles valides : admin, waiter, cook, accountant, cashier
 VALID_ROLES = ["admin", "waiter", "cook", "accountant", "cashier"]
 
 class UserRegister(BaseModel):
@@ -127,6 +127,7 @@ class OrderCreate(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: str
+    extra_minutes: Optional[int] = None
 
 class PaymentTransaction(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -161,26 +162,19 @@ async def get_current_user(authorization: str = Header(None)) -> Dict[str, Any]:
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token invalide")
 
-# ─── AUTH ────────────────────────────────────────────────────────────────────
-
 @api_router.post("/auth/register")
 async def register(user_data: UserRegister, current_user: Dict = Depends(get_current_user)):
-    """Inscription réservée aux admins uniquement"""
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Accès refusé — réservé aux administrateurs")
-
     if user_data.role not in VALID_ROLES:
         raise HTTPException(status_code=400, detail=f"Rôle invalide. Rôles valides : {VALID_ROLES}")
-
     existing = await db.users.find_one({"email": user_data.email}, {"_id": 0})
     if existing:
         raise HTTPException(status_code=400, detail="Email déjà utilisé")
-
     user = User(email=user_data.email, name=user_data.name, role=user_data.role)
     user_dict = user.model_dump()
     user_dict["password_hash"] = pwd_context.hash(user_data.password)
     user_dict["created_at"] = user_dict["created_at"].isoformat()
-
     await db.users.insert_one(user_dict)
     token = create_token(user.id, user.email, user.role)
     return {"user": user.model_dump(), "token": token}
@@ -192,7 +186,6 @@ async def login(credentials: UserLogin):
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
     if not pwd_context.verify(credentials.password, user_doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
-
     token = create_token(user_doc["id"], user_doc["email"], user_doc["role"])
     user_doc.pop("password_hash", None)
     if isinstance(user_doc.get("created_at"), str):
@@ -207,8 +200,6 @@ async def get_me(current_user: Dict = Depends(get_current_user)):
     if isinstance(user_doc.get("created_at"), str):
         user_doc["created_at"] = datetime.fromisoformat(user_doc["created_at"])
     return user_doc
-
-# ─── MENU ────────────────────────────────────────────────────────────────────
 
 @api_router.get("/menu", response_model=List[MenuItem])
 async def get_menu(category: Optional[str] = None):
@@ -252,8 +243,6 @@ async def delete_menu_item(item_id: str, current_user: Dict = Depends(get_curren
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Item non trouvé")
     return {"message": "Item supprimé"}
-
-# ─── TABLES ──────────────────────────────────────────────────────────────────
 
 @api_router.get("/tables", response_model=List[Table])
 async def get_tables():
@@ -301,8 +290,6 @@ async def delete_table(table_id: str, current_user: Dict = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Table non trouvée")
     return {"message": "Table supprimée"}
 
-# ─── USERS ───────────────────────────────────────────────────────────────────
-
 @api_router.get("/users", response_model=List[User])
 async def get_users(current_user: Dict = Depends(get_current_user)):
     if current_user["role"] != "admin":
@@ -345,18 +332,14 @@ async def update_user(user_id: str, user_data: dict, current_user: Dict = Depend
     updated = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
     return updated
 
-# ─── ORDERS ──────────────────────────────────────────────────────────────────
-
 @api_router.post("/orders", response_model=Order)
 async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get_current_user)):
     table = await db.tables.find_one({"id": order_data.table_id}, {"_id": 0})
     if not table:
         raise HTTPException(status_code=404, detail="Table non trouvée")
-
     total = sum(item.quantity * item.price for item in order_data.items)
     max_prep_time = 15
     items_with_prep_time = []
-
     for item in order_data.items:
         item_dict = item.model_dump()
         menu_item = await db.menu_items.find_one({"id": item.menu_item_id}, {"_id": 0})
@@ -368,7 +351,6 @@ async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get
         else:
             item_dict["preparation_time"] = 15
         items_with_prep_time.append(item_dict)
-
     order = Order(
         table_id=order_data.table_id,
         table_number=table["number"],
@@ -379,25 +361,13 @@ async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get
         guests_count=order_data.guests_count,
         estimated_preparation_time=max_prep_time
     )
-
     order_dict = order.model_dump()
     order_dict["created_at"] = order_dict["created_at"].isoformat()
     order_dict["updated_at"] = order_dict["updated_at"].isoformat()
     await db.orders.insert_one(order_dict)
-
-    # Fix tables partielles
     new_occupied = min(table.get("occupied_seats", 0) + order_data.guests_count, table["capacity"])
-    if new_occupied >= table["capacity"]:
-        new_status = "occupied"
-    elif new_occupied > 0:
-        new_status = "partial"
-    else:
-        new_status = "free"
-    await db.tables.update_one(
-        {"id": order_data.table_id},
-        {"$set": {"status": new_status, "occupied_seats": new_occupied}}
-    )
-
+    new_status = "occupied" if new_occupied >= table["capacity"] else "partial" if new_occupied > 0 else "free"
+    await db.tables.update_one({"id": order_data.table_id}, {"$set": {"status": new_status, "occupied_seats": new_occupied}})
     return order
 
 @api_router.get("/orders", response_model=List[Order])
@@ -428,12 +398,19 @@ async def get_order(order_id: str):
 
 @api_router.put("/orders/{order_id}/status", response_model=Order)
 async def update_order_status(order_id: str, status_data: OrderStatusUpdate):
-    update_data = {
-        "status": status_data.status,
-        "updated_at": datetime.now(timezone.utc).isoformat()
-    }
+    update_data = {"status": status_data.status, "updated_at": datetime.now(timezone.utc).isoformat()}
     if status_data.status == "in_progress":
         update_data["preparation_started_at"] = datetime.now(timezone.utc).isoformat()
+
+    # Extension timer cuisine : recalcule estimated_preparation_time
+    if status_data.extra_minutes and status_data.extra_minutes > 0:
+        order_doc = await db.orders.find_one({"id": order_id}, {"_id": 0})
+        if order_doc and order_doc.get("preparation_started_at"):
+            started = datetime.fromisoformat(order_doc["preparation_started_at"])
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            elapsed_minutes = (datetime.now(timezone.utc) - started).total_seconds() / 60
+            update_data["estimated_preparation_time"] = int(elapsed_minutes + status_data.extra_minutes)
 
     result = await db.orders.update_one({"id": order_id}, {"$set": update_data})
     if result.matched_count == 0:
@@ -445,26 +422,14 @@ async def update_order_status(order_id: str, status_data: OrderStatusUpdate):
     if isinstance(order.get("updated_at"), str):
         order["updated_at"] = datetime.fromisoformat(order["updated_at"])
 
-    # Fix tables partielles : libération progressive
     if status_data.status in ["completed", "cancelled"]:
         table_doc = await db.tables.find_one({"id": order["table_id"]}, {"_id": 0})
         if table_doc:
             guests = order.get("guests_count", 1)
             new_occupied = max(0, table_doc.get("occupied_seats", 0) - guests)
-            if new_occupied == 0:
-                new_status = "free"
-            elif new_occupied >= table_doc["capacity"]:
-                new_status = "occupied"
-            else:
-                new_status = "partial"
-            await db.tables.update_one(
-                {"id": order["table_id"]},
-                {"$set": {"status": new_status, "occupied_seats": new_occupied}}
-            )
-
+            new_status = "free" if new_occupied == 0 else "occupied" if new_occupied >= table_doc["capacity"] else "partial"
+            await db.tables.update_one({"id": order["table_id"]}, {"$set": {"status": new_status, "occupied_seats": new_occupied}})
     return order
-
-# ─── PAIEMENT CASH (caissier + admin) ────────────────────────────────────────
 
 class CashPaymentRequest(BaseModel):
     order_id: str
@@ -473,27 +438,19 @@ class CashPaymentRequest(BaseModel):
 async def process_cash_payment(payment_req: CashPaymentRequest, current_user: Dict = Depends(get_current_user)):
     if current_user["role"] not in ["admin", "cashier", "waiter"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
-
     order = await db.orders.find_one({"id": payment_req.order_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Commande non trouvée")
     if order["payment_status"] == "paid":
         raise HTTPException(status_code=400, detail="Commande déjà payée")
-
     await db.orders.update_one(
         {"id": payment_req.order_id},
-        {"$set": {
-            "payment_status": "paid",
-            "payment_method": "cash",
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }}
+        {"$set": {"payment_status": "paid", "payment_method": "cash", "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
-
     transaction = PaymentTransaction(
         order_id=payment_req.order_id,
         amount=float(order["total"]),
         currency="KMF",
-        session_id=None,
         payment_status="paid",
         metadata={"user_id": current_user["user_id"], "method": "cash"}
     )
@@ -501,19 +458,17 @@ async def process_cash_payment(payment_req: CashPaymentRequest, current_user: Di
     transaction_dict["created_at"] = transaction_dict["created_at"].isoformat()
     transaction_dict["updated_at"] = transaction_dict["updated_at"].isoformat()
     await db.payment_transactions.insert_one(transaction_dict)
-
     return {"success": True, "message": "Paiement cash enregistré", "order_id": payment_req.order_id}
 
-# ─── CAISSIER : commandes prêtes ─────────────────────────────────────────────
+# ─── CAISSIER ────────────────────────────────────────────────────────────────
 
 @api_router.get("/cashier/orders", response_model=List[Order])
 async def get_cashier_orders(current_user: Dict = Depends(get_current_user)):
-    """Retourne les commandes prêtes à encaisser (statut ready ou completed non payées)"""
+    """Commandes à encaisser : ready, served, completed — non payées"""
     if current_user["role"] not in ["admin", "cashier"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
-
     query = {
-        "status": {"$in": ["ready", "completed"]},
+        "status": {"$in": ["ready", "served", "completed"]},
         "payment_status": "unpaid"
     }
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
@@ -524,37 +479,64 @@ async def get_cashier_orders(current_user: Dict = Depends(get_current_user)):
             order["updated_at"] = datetime.fromisoformat(order["updated_at"])
     return orders
 
+@api_router.get("/cashier/export/csv")
+async def export_cashier_csv(current_user: Dict = Depends(get_current_user)):
+    """Export CSV des transactions pour rapprochement avec logiciel caisse"""
+    if current_user["role"] not in ["admin", "cashier", "accountant"]:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+
+    orders = await db.orders.find({"payment_status": "paid"}, {"_id": 0}).sort("created_at", -1).to_list(10000)
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=';')
+    writer.writerow(["Date", "Heure", "N° Commande", "Table", "Serveur", "Nb Couverts", "Articles", "Total KMF", "Total EUR", "Mode paiement", "Statut"])
+
+    EUR_TO_KMF = 491.96775
+    for order in orders:
+        created_at = order.get("created_at", "")
+        if isinstance(created_at, str):
+            try:
+                dt = datetime.fromisoformat(created_at)
+                date_str = dt.strftime("%d/%m/%Y")
+                time_str = dt.strftime("%H:%M")
+            except Exception:
+                date_str = str(created_at)[:10]
+                time_str = ""
+        else:
+            date_str = ""
+            time_str = ""
+        articles = " | ".join([f"{i.get('menu_item_name','')} x{i.get('quantity',1)}" for i in order.get("items", [])])
+        total_kmf = order.get("total", 0)
+        total_eur = round(total_kmf / EUR_TO_KMF, 2)
+        writer.writerow([date_str, time_str, order.get("id","")[:8].upper(), order.get("table_number",""),
+                         order.get("waiter_name",""), order.get("guests_count",1), articles,
+                         f"{total_kmf:.0f}", f"{total_eur:.2f}", (order.get("payment_method") or "cash").upper(), "PAYÉ"])
+
+    output.seek(0)
+    date_export = datetime.now().strftime("%Y%m%d_%H%M")
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode("utf-8-sig")),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=caisse_nassib_{date_export}.csv"}
+    )
+
 # ─── STATS ───────────────────────────────────────────────────────────────────
 
 @api_router.get("/stats/dashboard")
 async def get_dashboard_stats(current_user: Dict = Depends(get_current_user)):
     if current_user["role"] not in ["admin", "accountant"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
-
     today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     total_orders = await db.orders.count_documents({})
     today_orders = await db.orders.count_documents({"created_at": {"$gte": today.isoformat()}})
-
     pipeline = [{"$match": {"payment_status": "paid"}}, {"$group": {"_id": None, "total": {"$sum": "$total"}}}]
     revenue_result = await db.orders.aggregate(pipeline).to_list(1)
     total_revenue = revenue_result[0]["total"] if revenue_result else 0.0
-
-    pipeline_today = [
-        {"$match": {"payment_status": "paid", "created_at": {"$gte": today.isoformat()}}},
-        {"$group": {"_id": None, "total": {"$sum": "$total"}}}
-    ]
+    pipeline_today = [{"$match": {"payment_status": "paid", "created_at": {"$gte": today.isoformat()}}}, {"$group": {"_id": None, "total": {"$sum": "$total"}}}]
     revenue_today_result = await db.orders.aggregate(pipeline_today).to_list(1)
     today_revenue = revenue_today_result[0]["total"] if revenue_today_result else 0.0
-
     pending_orders = await db.orders.count_documents({"status": "pending"})
-
-    return {
-        "total_orders": total_orders,
-        "today_orders": today_orders,
-        "total_revenue": round(total_revenue, 2),
-        "today_revenue": round(today_revenue, 2),
-        "pending_orders": pending_orders
-    }
+    return {"total_orders": total_orders, "today_orders": today_orders, "total_revenue": round(total_revenue, 2), "today_revenue": round(today_revenue, 2), "pending_orders": pending_orders}
 
 # ─── FACTURE PDF ─────────────────────────────────────────────────────────────
 
@@ -566,25 +548,19 @@ def format_currency_pdf(amount_kmf):
 
 @api_router.get("/orders/{order_id}/invoice")
 async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get_current_user)):
-    """Génère une facture PDF — accessible à admin, cashier, accountant"""
     if current_user["role"] not in ["admin", "cashier", "accountant", "waiter"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
-
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Commande non trouvée")
-
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=1.5*cm, bottomMargin=2*cm)
-
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=22, textColor=colors.HexColor('#E11D48'), alignment=TA_CENTER, spaceAfter=5)
     header_style = ParagraphStyle('Header', parent=styles['Normal'], fontSize=10, textColor=colors.HexColor('#64748B'), alignment=TA_CENTER)
     section_style = ParagraphStyle('Section', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#1E293B'), spaceBefore=15, spaceAfter=10)
     contact_style = ParagraphStyle('Contact', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#F59E0B'), alignment=TA_CENTER)
-
     elements = []
-
     try:
         import urllib.request
         logo_url = "https://customer-assets.emergentagent.com/job_nassib-digital/artifacts/et6rs79p_IMG_9019.jpeg"
@@ -594,12 +570,10 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
         elements.append(logo)
     except Exception:
         pass
-
     elements.append(Paragraph("FACTURE", title_style))
     elements.append(Paragraph("Restaurant Nassib - Comores", header_style))
     elements.append(Paragraph("<b>Livraison : +269 3320308</b>", contact_style))
     elements.append(Spacer(1, 15))
-
     invoice_date = datetime.now().strftime("%d/%m/%Y %H:%M")
     order_date = order.get("created_at", "")
     if isinstance(order_date, str):
@@ -607,13 +581,11 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
             order_date = datetime.fromisoformat(order_date).strftime("%d/%m/%Y %H:%M")
         except Exception:
             order_date = invoice_date
-
     info_data = [
         ["N° Commande:", order_id[:8].upper(), "Date commande:", str(order_date)],
         ["Table:", str(order.get("table_number", "N/A")), "Serveur:", order.get("waiter_name", "N/A")],
         ["Statut paiement:", "PAYÉ" if order.get("payment_status") == "paid" else "NON PAYÉ", "Mode:", (order.get("payment_method") or "N/A").upper()],
     ]
-
     info_table = PDFTable(info_data, colWidths=[3*cm, 4.5*cm, 3*cm, 4.5*cm])
     info_table.setStyle(TableStyle([
         ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#64748B')),
@@ -625,9 +597,7 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     ]))
     elements.append(info_table)
     elements.append(Spacer(1, 20))
-
     elements.append(Paragraph("DÉTAIL DE LA COMMANDE", section_style))
-
     table_data = [["Article", "Qté", "Prix unit.", "Total KMF", "Total EUR"]]
     for item in order.get("items", []):
         name = item.get("menu_item_name", "Article")
@@ -637,12 +607,10 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
         kmf, eur = format_currency_pdf(total)
         price_kmf, _ = format_currency_pdf(price)
         table_data.append([name, str(qty), price_kmf, kmf, eur])
-
     total_amount = order.get("total", 0)
     total_kmf, total_eur = format_currency_pdf(total_amount)
     table_data.append(["", "", "", "", ""])
     table_data.append(["", "", "TOTAL:", total_kmf, total_eur])
-
     items_table = PDFTable(table_data, colWidths=[6*cm, 1.5*cm, 3*cm, 3*cm, 3*cm])
     items_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E293B')),
@@ -660,42 +628,21 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     ]))
     elements.append(items_table)
     elements.append(Spacer(1, 25))
-
     footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#94A3B8'), alignment=TA_CENTER)
     delivery_style = ParagraphStyle('Delivery', parent=styles['Normal'], fontSize=11, textColor=colors.HexColor('#E11D48'), alignment=TA_CENTER, spaceBefore=10)
-
     elements.append(Paragraph("<b>COMMANDE LIVRAISON</b>", delivery_style))
     elements.append(Paragraph("<font size='14' color='#F59E0B'><b>+269 3320308</b></font>", ParagraphStyle('Phone', alignment=TA_CENTER)))
     elements.append(Spacer(1, 15))
     elements.append(Paragraph(f"Taux de conversion: 1 EUR = {EUR_TO_KMF} KMF", footer_style))
     elements.append(Paragraph(f"Facture générée le {invoice_date} | Restaurant Nassib - Comores", footer_style))
     elements.append(Paragraph("Merci de votre visite !", footer_style))
-
     doc.build(elements)
     buffer.seek(0)
-
-    return StreamingResponse(
-        buffer,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=facture_nassib_{order_id[:8]}.pdf"}
-    )
-
-# ─── APP SETUP ───────────────────────────────────────────────────────────────
+    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=facture_nassib_{order_id[:8]}.pdf"})
 
 app.include_router(api_router)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','), allow_methods=["*"], allow_headers=["*"])
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
