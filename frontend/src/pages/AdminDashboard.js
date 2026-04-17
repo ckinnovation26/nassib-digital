@@ -7,7 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { LogOut, Users, UtensilsCrossed, Table2, Trash2, Edit, Plus, Save, Clock, Settings, Upload } from 'lucide-react';
+import { LogOut, Users, UtensilsCrossed, Table2, Trash2, Edit, Plus, Save, Clock, Settings, Upload, BarChart2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '../utils/currency';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -15,6 +16,7 @@ const API = `${BACKEND_URL}/api`;
 
 export const AdminDashboard = () => {
   const { user, logout, token } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('menu');
   const [loading, setLoading] = useState(true);
   const csvInputRef = useRef(null);
@@ -238,9 +240,14 @@ export const AdminDashboard = () => {
               <p className="text-xs text-slate-400 font-medium tracking-wide">Connecté: {user?.name}</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={logout} data-testid="admin-logout-btn" className="text-slate-400 hover:text-rose-400">
-            <LogOut className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/kitchen-performance')} className="text-slate-400 hover:text-amber-400">
+              <BarChart2 className="w-5 h-5" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={logout} data-testid="admin-logout-btn" className="text-slate-400 hover:text-rose-400">
+              <LogOut className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </header>
 
