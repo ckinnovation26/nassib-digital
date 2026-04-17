@@ -159,7 +159,6 @@ async def get_current_user(authorization: str = Header(None)) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Token invalide")
 
 def fmt_eur(amount_kmf: float) -> str:
-    """Formate un montant KMF en EUR avec virgule comme séparateur décimal"""
     eur = amount_kmf / EUR_TO_KMF
     return f"{eur:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
@@ -179,15 +178,12 @@ async def register(user_data: UserRegister, current_user: Dict = Depends(get_cur
     user_dict["password_hash"] = pwd_context.hash(user_data.password)
     user_dict["created_at"] = user_dict["created_at"].isoformat()
     await db.users.insert_one(user_dict)
-    token = create_token(user.id, user.email, user.role)
-    return {"user": user.model_dump(), "token": token}
+    return {"user": user.model_dump(), "token": create_token(user.id, user.email, user.role)}
 
 @api_router.post("/auth/login")
 async def login(credentials: UserLogin):
     user_doc = await db.users.find_one({"email": credentials.email}, {"_id": 0})
-    if not user_doc:
-        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
-    if not pwd_context.verify(credentials.password, user_doc["password_hash"]):
+    if not user_doc or not pwd_context.verify(credentials.password, user_doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
     token = create_token(user_doc["id"], user_doc["email"], user_doc["role"])
     user_doc.pop("password_hash", None)
@@ -321,8 +317,7 @@ async def update_user(user_id: str, user_data: dict, current_user: Dict = Depend
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Accès refusé")
     update_fields = {}
-    if "name" in user_data:
-        update_fields["name"] = user_data["name"]
+    if "name" in user_data: update_fields["name"] = user_data["name"]
     if "role" in user_data:
         if user_data["role"] not in VALID_ROLES:
             raise HTTPException(status_code=400, detail=f"Rôle invalide. Rôles valides : {VALID_ROLES}")
@@ -352,8 +347,7 @@ async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get
         if menu_item:
             prep_time = menu_item.get("preparation_time", 15)
             item_dict["preparation_time"] = prep_time
-            if prep_time > max_prep_time:
-                max_prep_time = prep_time
+            if prep_time > max_prep_time: max_prep_time = prep_time
         else:
             item_dict["preparation_time"] = 15
         items_with_prep_time.append(item_dict)
@@ -375,27 +369,20 @@ async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get
 @api_router.get("/orders", response_model=List[Order])
 async def get_orders(status: Optional[str] = None, table_id: Optional[str] = None):
     query = {}
-    if status:
-        query["status"] = status
-    if table_id:
-        query["table_id"] = table_id
+    if status: query["status"] = status
+    if table_id: query["table_id"] = table_id
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     for order in orders:
-        if isinstance(order.get("created_at"), str):
-            order["created_at"] = datetime.fromisoformat(order["created_at"])
-        if isinstance(order.get("updated_at"), str):
-            order["updated_at"] = datetime.fromisoformat(order["updated_at"])
+        if isinstance(order.get("created_at"), str): order["created_at"] = datetime.fromisoformat(order["created_at"])
+        if isinstance(order.get("updated_at"), str): order["updated_at"] = datetime.fromisoformat(order["updated_at"])
     return orders
 
 @api_router.get("/orders/{order_id}", response_model=Order)
 async def get_order(order_id: str):
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
-    if not order:
-        raise HTTPException(status_code=404, detail="Commande non trouvée")
-    if isinstance(order.get("created_at"), str):
-        order["created_at"] = datetime.fromisoformat(order["created_at"])
-    if isinstance(order.get("updated_at"), str):
-        order["updated_at"] = datetime.fromisoformat(order["updated_at"])
+    if not order: raise HTTPException(status_code=404, detail="Commande non trouvée")
+    if isinstance(order.get("created_at"), str): order["created_at"] = datetime.fromisoformat(order["created_at"])
+    if isinstance(order.get("updated_at"), str): order["updated_at"] = datetime.fromisoformat(order["updated_at"])
     return order
 
 @api_router.put("/orders/{order_id}/status", response_model=Order)
@@ -407,18 +394,14 @@ async def update_order_status(order_id: str, status_data: OrderStatusUpdate):
         order_doc = await db.orders.find_one({"id": order_id}, {"_id": 0})
         if order_doc and order_doc.get("preparation_started_at"):
             started = datetime.fromisoformat(order_doc["preparation_started_at"])
-            if started.tzinfo is None:
-                started = started.replace(tzinfo=timezone.utc)
+            if started.tzinfo is None: started = started.replace(tzinfo=timezone.utc)
             elapsed_minutes = (datetime.now(timezone.utc) - started).total_seconds() / 60
             update_data["estimated_preparation_time"] = int(elapsed_minutes + status_data.extra_minutes)
     result = await db.orders.update_one({"id": order_id}, {"$set": update_data})
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Commande non trouvée")
+    if result.matched_count == 0: raise HTTPException(status_code=404, detail="Commande non trouvée")
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
-    if isinstance(order.get("created_at"), str):
-        order["created_at"] = datetime.fromisoformat(order["created_at"])
-    if isinstance(order.get("updated_at"), str):
-        order["updated_at"] = datetime.fromisoformat(order["updated_at"])
+    if isinstance(order.get("created_at"), str): order["created_at"] = datetime.fromisoformat(order["created_at"])
+    if isinstance(order.get("updated_at"), str): order["updated_at"] = datetime.fromisoformat(order["updated_at"])
     if status_data.status in ["completed", "cancelled"]:
         table_doc = await db.tables.find_one({"id": order["table_id"]}, {"_id": 0})
         if table_doc:
@@ -438,17 +421,15 @@ async def process_cash_payment(payment_req: CashPaymentRequest, current_user: Di
     if current_user["role"] not in ["admin", "cashier", "waiter"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
     order = await db.orders.find_one({"id": payment_req.order_id}, {"_id": 0})
-    if not order:
-        raise HTTPException(status_code=404, detail="Commande non trouvée")
-    if order["payment_status"] == "paid":
-        raise HTTPException(status_code=400, detail="Commande déjà payée")
+    if not order: raise HTTPException(status_code=404, detail="Commande non trouvée")
+    if order["payment_status"] == "paid": raise HTTPException(status_code=400, detail="Commande déjà payée")
     await db.orders.update_one(
         {"id": payment_req.order_id},
         {"$set": {"payment_status": "paid", "payment_method": "cash", "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     transaction = PaymentTransaction(
         order_id=payment_req.order_id, amount=float(order["total"]), currency="KMF",
-        payment_status="paid", metadata={"user_id": current_user["user_id"], "cashier_name": current_user.get("email", ""), "method": "cash"}
+        payment_status="paid", metadata={"user_id": current_user["user_id"], "method": "cash"}
     )
     transaction_dict = transaction.model_dump()
     transaction_dict["created_at"] = transaction_dict["created_at"].isoformat()
@@ -465,10 +446,8 @@ async def get_cashier_orders(current_user: Dict = Depends(get_current_user)):
     query = {"status": {"$in": ["ready", "served", "completed"]}, "payment_status": "unpaid"}
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     for order in orders:
-        if isinstance(order.get("created_at"), str):
-            order["created_at"] = datetime.fromisoformat(order["created_at"])
-        if isinstance(order.get("updated_at"), str):
-            order["updated_at"] = datetime.fromisoformat(order["updated_at"])
+        if isinstance(order.get("created_at"), str): order["created_at"] = datetime.fromisoformat(order["created_at"])
+        if isinstance(order.get("updated_at"), str): order["updated_at"] = datetime.fromisoformat(order["updated_at"])
     return orders
 
 @api_router.get("/cashier/history")
@@ -477,35 +456,24 @@ async def get_cashier_history(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None)
 ):
-    """Historique des ventes payées — filtrable par période"""
     if current_user["role"] not in ["admin", "cashier"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
     query = {"payment_status": "paid"}
-    if date_from:
-        query.setdefault("created_at", {})["$gte"] = date_from
+    if date_from: query.setdefault("created_at", {})["$gte"] = date_from
     if date_to:
-        # Inclure toute la journée de date_to
         try:
-            dt_to = datetime.fromisoformat(date_to)
-            dt_to = dt_to.replace(hour=23, minute=59, second=59)
+            dt_to = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
             query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
         except Exception:
             query.setdefault("created_at", {})["$lte"] = date_to
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     for order in orders:
-        if isinstance(order.get("created_at"), str):
-            order["created_at"] = datetime.fromisoformat(order["created_at"])
-        if isinstance(order.get("updated_at"), str):
-            order["updated_at"] = datetime.fromisoformat(order["updated_at"])
+        if isinstance(order.get("created_at"), str): order["created_at"] = datetime.fromisoformat(order["created_at"])
+        if isinstance(order.get("updated_at"), str): order["updated_at"] = datetime.fromisoformat(order["updated_at"])
     total_kmf = sum(o.get("total", 0) for o in orders)
-    return {
-        "orders": orders,
-        "count": len(orders),
-        "total_kmf": round(total_kmf, 2),
-        "total_eur": round(total_kmf / EUR_TO_KMF, 2)
-    }
+    return {"orders": orders, "count": len(orders), "total_kmf": round(total_kmf, 2), "total_eur": round(total_kmf / EUR_TO_KMF, 2)}
 
-# ─── COMPTA : STATS + EXPORT CSV ─────────────────────────────────────────────
+# ─── COMPTA ──────────────────────────────────────────────────────────────────
 
 @api_router.get("/stats/dashboard")
 async def get_dashboard_stats(
@@ -515,40 +483,25 @@ async def get_dashboard_stats(
 ):
     if current_user["role"] not in ["admin", "accountant"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
-
     today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-
-    # Filtre période pour les stats globales
     period_query = {"payment_status": "paid"}
-    if date_from:
-        period_query.setdefault("created_at", {})["$gte"] = date_from
+    if date_from: period_query.setdefault("created_at", {})["$gte"] = date_from
     if date_to:
         try:
             dt_to = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
             period_query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
         except Exception:
             period_query.setdefault("created_at", {})["$lte"] = date_to
-
-    total_orders = await db.orders.count_documents({} if not (date_from or date_to) else {k: v for k, v in period_query.items() if k != "payment_status"})
+    total_orders = await db.orders.count_documents({})
     today_orders = await db.orders.count_documents({"created_at": {"$gte": today.isoformat()}})
-
     pipeline = [{"$match": period_query}, {"$group": {"_id": None, "total": {"$sum": "$total"}}}]
     revenue_result = await db.orders.aggregate(pipeline).to_list(1)
     total_revenue = revenue_result[0]["total"] if revenue_result else 0.0
-
     pipeline_today = [{"$match": {"payment_status": "paid", "created_at": {"$gte": today.isoformat()}}}, {"$group": {"_id": None, "total": {"$sum": "$total"}}}]
     revenue_today_result = await db.orders.aggregate(pipeline_today).to_list(1)
     today_revenue = revenue_today_result[0]["total"] if revenue_today_result else 0.0
-
     pending_orders = await db.orders.count_documents({"status": "pending"})
-
-    return {
-        "total_orders": total_orders,
-        "today_orders": today_orders,
-        "total_revenue": round(total_revenue, 2),
-        "today_revenue": round(today_revenue, 2),
-        "pending_orders": pending_orders
-    }
+    return {"total_orders": total_orders, "today_orders": today_orders, "total_revenue": round(total_revenue, 2), "today_revenue": round(today_revenue, 2), "pending_orders": pending_orders}
 
 @api_router.get("/accounting/orders")
 async def get_accounting_orders(
@@ -556,22 +509,17 @@ async def get_accounting_orders(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None)
 ):
-    """Commandes filtrées par période pour la compta"""
     if current_user["role"] not in ["admin", "accountant"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
     query = {}
-    if date_from:
-        query.setdefault("created_at", {})["$gte"] = date_from
+    if date_from: query.setdefault("created_at", {})["$gte"] = date_from
     if date_to:
         try:
             dt_to = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
             query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
         except Exception:
             query.setdefault("created_at", {})["$lte"] = date_to
-
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(5000)
-
-    # Enrichir avec le nom du serveur
     user_cache = {}
     for order in orders:
         waiter_email = order.get("waiter_name", "")
@@ -579,11 +527,8 @@ async def get_accounting_orders(
             user_doc = await db.users.find_one({"email": waiter_email}, {"_id": 0, "name": 1})
             user_cache[waiter_email] = user_doc["name"] if user_doc else waiter_email
         order["waiter_display_name"] = user_cache[waiter_email]
-        if isinstance(order.get("created_at"), str):
-            order["created_at"] = datetime.fromisoformat(order["created_at"])
-        if isinstance(order.get("updated_at"), str):
-            order["updated_at"] = datetime.fromisoformat(order["updated_at"])
-
+        if isinstance(order.get("created_at"), str): order["created_at"] = datetime.fromisoformat(order["created_at"])
+        if isinstance(order.get("updated_at"), str): order["updated_at"] = datetime.fromisoformat(order["updated_at"])
     return orders
 
 @api_router.get("/accounting/export/csv")
@@ -592,34 +537,26 @@ async def export_accounting_csv(
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None)
 ):
-    """Export CSV comptabilité avec filtre période + ligne totaux + euros avec virgule"""
     if current_user["role"] not in ["admin", "accountant"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
-
     query = {"payment_status": "paid"}
-    if date_from:
-        query.setdefault("created_at", {})["$gte"] = date_from
+    if date_from: query.setdefault("created_at", {})["$gte"] = date_from
     if date_to:
         try:
             dt_to = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
             query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
         except Exception:
             query.setdefault("created_at", {})["$lte"] = date_to
-
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(10000)
-
-    # Enrichir avec noms des serveurs
     user_cache = {}
     for order in orders:
         waiter_email = order.get("waiter_name", "")
         if waiter_email not in user_cache:
             user_doc = await db.users.find_one({"email": waiter_email}, {"_id": 0, "name": 1})
             user_cache[waiter_email] = user_doc["name"] if user_doc else waiter_email
-
     output = io.StringIO()
     writer = csv.writer(output, delimiter=';')
     writer.writerow(["Date", "Heure", "N° Commande", "Table", "Serveur", "Nb Couverts", "Articles", "Total KMF", "Total EUR", "Mode paiement", "Statut"])
-
     total_kmf_sum = 0.0
     for order in orders:
         created_at = order.get("created_at", "")
@@ -629,27 +566,19 @@ async def export_accounting_csv(
                 date_str = dt.strftime("%d/%m/%Y")
                 time_str = dt.strftime("%H:%M")
             except Exception:
-                date_str = str(created_at)[:10]
-                time_str = ""
+                date_str = str(created_at)[:10]; time_str = ""
         else:
-            date_str = ""
-            time_str = ""
-
+            date_str = ""; time_str = ""
         waiter_name = user_cache.get(order.get("waiter_name", ""), order.get("waiter_name", ""))
         articles = " | ".join([f"{i.get('menu_item_name','')} x{i.get('quantity',1)}" for i in order.get("items", [])])
         total_kmf = order.get("total", 0)
         total_kmf_sum += total_kmf
-        total_eur_str = fmt_eur(total_kmf)
-
         writer.writerow([date_str, time_str, order.get("id","")[:8].upper(), order.get("table_number",""),
                          waiter_name, order.get("guests_count",1), articles,
-                         f"{total_kmf:.0f}", total_eur_str,
+                         f"{total_kmf:.0f}", fmt_eur(total_kmf),
                          (order.get("payment_method") or "cash").upper(), "PAYÉ"])
-
-    # Ligne de totaux
     writer.writerow([])
     writer.writerow(["TOTAL", "", "", "", "", len(orders), "", f"{total_kmf_sum:.0f}", fmt_eur(total_kmf_sum), "", ""])
-
     output.seek(0)
     date_export = datetime.now().strftime("%Y%m%d_%H%M")
     suffix = f"_{date_from[:10]}_{date_to[:10]}" if date_from and date_to else ""
@@ -658,6 +587,96 @@ async def export_accounting_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=compta_nassib{suffix}_{date_export}.csv"}
     )
+
+# ─── PERFORMANCE CUISINE ─────────────────────────────────────────────────────
+
+@api_router.get("/kitchen/performance")
+async def get_kitchen_performance(
+    current_user: Dict = Depends(get_current_user),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None)
+):
+    """Stats globales de performance cuisine — admin uniquement"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Accès refusé — admin uniquement")
+
+    query = {"preparation_started_at": {"$exists": True, "$ne": None}}
+    if date_from: query.setdefault("created_at", {})["$gte"] = date_from
+    if date_to:
+        try:
+            dt_to = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
+            query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
+        except Exception:
+            query.setdefault("created_at", {})["$lte"] = date_to
+
+    orders = await db.orders.find(query, {"_id": 0}).to_list(5000)
+
+    total_orders = len(orders)
+    prep_times = []  # temps réel de préparation en minutes
+    overtime_count = 0
+    fastest = None
+    slowest = None
+
+    for order in orders:
+        started_str = order.get("preparation_started_at")
+        updated_str = order.get("updated_at")
+        estimated = order.get("estimated_preparation_time", 15)
+
+        if not started_str or order.get("status") not in ["ready", "served", "completed", "paid"]:
+            continue
+
+        try:
+            started = datetime.fromisoformat(started_str)
+            if started.tzinfo is None: started = started.replace(tzinfo=timezone.utc)
+
+            # Utiliser updated_at comme approximation de la fin de préparation
+            updated = datetime.fromisoformat(updated_str) if isinstance(updated_str, str) else datetime.now(timezone.utc)
+            if updated.tzinfo is None: updated = updated.replace(tzinfo=timezone.utc)
+
+            real_minutes = round((updated - started).total_seconds() / 60, 1)
+            if real_minutes <= 0 or real_minutes > 180:
+                continue  # Données aberrantes
+
+            prep_times.append({
+                "order_id": order.get("id", "")[:8],
+                "table": order.get("table_number"),
+                "real_minutes": real_minutes,
+                "estimated_minutes": estimated,
+                "delta": round(real_minutes - estimated, 1),
+                "is_overtime": real_minutes > estimated,
+                "date": started_str[:10] if started_str else ""
+            })
+
+            if real_minutes > estimated:
+                overtime_count += 1
+
+            if fastest is None or real_minutes < fastest["real_minutes"]:
+                fastest = {"order_id": order.get("id","")[:8], "table": order.get("table_number"), "minutes": real_minutes}
+            if slowest is None or real_minutes > slowest["real_minutes"]:
+                slowest = {"order_id": order.get("id","")[:8], "table": order.get("table_number"), "minutes": real_minutes}
+
+        except Exception:
+            continue
+
+    measured = len(prep_times)
+    avg_real = round(sum(p["real_minutes"] for p in prep_times) / measured, 1) if measured > 0 else 0
+    avg_estimated = round(sum(p["estimated_minutes"] for p in prep_times) / measured, 1) if measured > 0 else 0
+    overtime_rate = round((overtime_count / measured) * 100, 1) if measured > 0 else 0
+    on_time_rate = round(100 - overtime_rate, 1)
+
+    return {
+        "total_orders": total_orders,
+        "measured_orders": measured,
+        "avg_real_minutes": avg_real,
+        "avg_estimated_minutes": avg_estimated,
+        "avg_delta_minutes": round(avg_real - avg_estimated, 1),
+        "overtime_count": overtime_count,
+        "overtime_rate": overtime_rate,
+        "on_time_rate": on_time_rate,
+        "fastest": fastest,
+        "slowest": slowest,
+        "details": prep_times[-20:]  # 20 dernières commandes
+    }
 
 # ─── FACTURE PDF ─────────────────────────────────────────────────────────────
 
@@ -670,8 +689,7 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     if current_user["role"] not in ["admin", "cashier", "accountant", "waiter"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
-    if not order:
-        raise HTTPException(status_code=404, detail="Commande non trouvée")
+    if not order: raise HTTPException(status_code=404, detail="Commande non trouvée")
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=1.5*cm, bottomMargin=2*cm)
     styles = getSampleStyleSheet()
@@ -696,10 +714,8 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     invoice_date = datetime.now().strftime("%d/%m/%Y %H:%M")
     order_date = order.get("created_at", "")
     if isinstance(order_date, str):
-        try:
-            order_date = datetime.fromisoformat(order_date).strftime("%d/%m/%Y %H:%M")
-        except Exception:
-            order_date = invoice_date
+        try: order_date = datetime.fromisoformat(order_date).strftime("%d/%m/%Y %H:%M")
+        except Exception: order_date = invoice_date
     info_data = [
         ["N° Commande:", order_id[:8].upper(), "Date commande:", str(order_date)],
         ["Table:", str(order.get("table_number", "N/A")), "Serveur:", order.get("waiter_name", "N/A")],
@@ -719,11 +735,8 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     elements.append(Paragraph("DÉTAIL DE LA COMMANDE", section_style))
     table_data = [["Article", "Qté", "Prix unit.", "Total KMF", "Total EUR"]]
     for item in order.get("items", []):
-        qty = item.get("quantity", 1)
-        price = item.get("price", 0)
-        total = qty * price
-        kmf, eur = format_currency_pdf(total)
-        price_kmf, _ = format_currency_pdf(price)
+        qty = item.get("quantity", 1); price = item.get("price", 0); total = qty * price
+        kmf, eur = format_currency_pdf(total); price_kmf, _ = format_currency_pdf(price)
         table_data.append([item.get("menu_item_name", "Article"), str(qty), price_kmf, kmf, eur])
     total_amount = order.get("total", 0)
     total_kmf, total_eur = format_currency_pdf(total_amount)
