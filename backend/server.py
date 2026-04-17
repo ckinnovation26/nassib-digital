@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Header
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Header, Query
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -38,6 +38,7 @@ app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
 VALID_ROLES = ["admin", "waiter", "cook", "accountant", "cashier"]
+EUR_TO_KMF = 491.96775
 
 class UserRegister(BaseModel):
     email: EmailStr
@@ -142,12 +143,7 @@ class PaymentTransaction(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 def create_token(user_id: str, email: str, role: str) -> str:
-    payload = {
-        "user_id": user_id,
-        "email": email,
-        "role": role,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION)
-    }
+    payload = {"user_id": user_id, "email": email, "role": role, "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION)}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 async def get_current_user(authorization: str = Header(None)) -> Dict[str, Any]:
@@ -161,6 +157,13 @@ async def get_current_user(authorization: str = Header(None)) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Token expiré")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token invalide")
+
+def fmt_eur(amount_kmf: float) -> str:
+    """Formate un montant KMF en EUR avec virgule comme séparateur décimal"""
+    eur = amount_kmf / EUR_TO_KMF
+    return f"{eur:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+# ─── AUTH ────────────────────────────────────────────────────────────────────
 
 @api_router.post("/auth/register")
 async def register(user_data: UserRegister, current_user: Dict = Depends(get_current_user)):
@@ -201,6 +204,8 @@ async def get_me(current_user: Dict = Depends(get_current_user)):
         user_doc["created_at"] = datetime.fromisoformat(user_doc["created_at"])
     return user_doc
 
+# ─── MENU ────────────────────────────────────────────────────────────────────
+
 @api_router.get("/menu", response_model=List[MenuItem])
 async def get_menu(category: Optional[str] = None):
     query = {}
@@ -226,8 +231,7 @@ async def create_menu_item(item_data: MenuItemCreate, current_user: Dict = Depen
 async def update_menu_item(item_id: str, item_data: MenuItemCreate, current_user: Dict = Depends(get_current_user)):
     if current_user["role"] not in ["admin", "accountant"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
-    update_data = item_data.model_dump()
-    result = await db.menu_items.update_one({"id": item_id}, {"$set": update_data})
+    result = await db.menu_items.update_one({"id": item_id}, {"$set": item_data.model_dump()})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Item non trouvé")
     updated = await db.menu_items.find_one({"id": item_id}, {"_id": 0})
@@ -243,6 +247,8 @@ async def delete_menu_item(item_id: str, current_user: Dict = Depends(get_curren
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Item non trouvé")
     return {"message": "Item supprimé"}
+
+# ─── TABLES ──────────────────────────────────────────────────────────────────
 
 @api_router.get("/tables", response_model=List[Table])
 async def get_tables():
@@ -279,16 +285,15 @@ async def update_table(table_id: str, table_data: TableUpdate):
 async def delete_table(table_id: str, current_user: Dict = Depends(get_current_user)):
     if current_user["role"] not in ["admin"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
-    active_orders = await db.orders.count_documents({
-        "table_id": table_id,
-        "status": {"$nin": ["completed", "cancelled"]}
-    })
+    active_orders = await db.orders.count_documents({"table_id": table_id, "status": {"$nin": ["completed", "cancelled"]}})
     if active_orders > 0:
         raise HTTPException(status_code=400, detail="Impossible de supprimer une table avec des commandes actives")
     result = await db.tables.delete_one({"id": table_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Table non trouvée")
     return {"message": "Table supprimée"}
+
+# ─── USERS ───────────────────────────────────────────────────────────────────
 
 @api_router.get("/users", response_model=List[User])
 async def get_users(current_user: Dict = Depends(get_current_user)):
@@ -329,8 +334,9 @@ async def update_user(user_id: str, user_data: dict, current_user: Dict = Depend
     result = await db.users.update_one({"id": user_id}, {"$set": update_fields})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-    updated = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
-    return updated
+    return await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+
+# ─── ORDERS ──────────────────────────────────────────────────────────────────
 
 @api_router.post("/orders", response_model=Order)
 async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get_current_user)):
@@ -352,14 +358,10 @@ async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get
             item_dict["preparation_time"] = 15
         items_with_prep_time.append(item_dict)
     order = Order(
-        table_id=order_data.table_id,
-        table_number=table["number"],
-        waiter_id=current_user["user_id"],
-        waiter_name=current_user.get("email", "Unknown"),
-        items=items_with_prep_time,
-        total=total,
-        guests_count=order_data.guests_count,
-        estimated_preparation_time=max_prep_time
+        table_id=order_data.table_id, table_number=table["number"],
+        waiter_id=current_user["user_id"], waiter_name=current_user.get("email", "Unknown"),
+        items=items_with_prep_time, total=total,
+        guests_count=order_data.guests_count, estimated_preparation_time=max_prep_time
     )
     order_dict = order.model_dump()
     order_dict["created_at"] = order_dict["created_at"].isoformat()
@@ -401,8 +403,6 @@ async def update_order_status(order_id: str, status_data: OrderStatusUpdate):
     update_data = {"status": status_data.status, "updated_at": datetime.now(timezone.utc).isoformat()}
     if status_data.status == "in_progress":
         update_data["preparation_started_at"] = datetime.now(timezone.utc).isoformat()
-
-    # Extension timer cuisine : recalcule estimated_preparation_time
     if status_data.extra_minutes and status_data.extra_minutes > 0:
         order_doc = await db.orders.find_one({"id": order_id}, {"_id": 0})
         if order_doc and order_doc.get("preparation_started_at"):
@@ -411,17 +411,14 @@ async def update_order_status(order_id: str, status_data: OrderStatusUpdate):
                 started = started.replace(tzinfo=timezone.utc)
             elapsed_minutes = (datetime.now(timezone.utc) - started).total_seconds() / 60
             update_data["estimated_preparation_time"] = int(elapsed_minutes + status_data.extra_minutes)
-
     result = await db.orders.update_one({"id": order_id}, {"$set": update_data})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Commande non trouvée")
-
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if isinstance(order.get("created_at"), str):
         order["created_at"] = datetime.fromisoformat(order["created_at"])
     if isinstance(order.get("updated_at"), str):
         order["updated_at"] = datetime.fromisoformat(order["updated_at"])
-
     if status_data.status in ["completed", "cancelled"]:
         table_doc = await db.tables.find_one({"id": order["table_id"]}, {"_id": 0})
         if table_doc:
@@ -430,6 +427,8 @@ async def update_order_status(order_id: str, status_data: OrderStatusUpdate):
             new_status = "free" if new_occupied == 0 else "occupied" if new_occupied >= table_doc["capacity"] else "partial"
             await db.tables.update_one({"id": order["table_id"]}, {"$set": {"status": new_status, "occupied_seats": new_occupied}})
     return order
+
+# ─── PAIEMENT CASH ───────────────────────────────────────────────────────────
 
 class CashPaymentRequest(BaseModel):
     order_id: str
@@ -448,11 +447,8 @@ async def process_cash_payment(payment_req: CashPaymentRequest, current_user: Di
         {"$set": {"payment_status": "paid", "payment_method": "cash", "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     transaction = PaymentTransaction(
-        order_id=payment_req.order_id,
-        amount=float(order["total"]),
-        currency="KMF",
-        payment_status="paid",
-        metadata={"user_id": current_user["user_id"], "method": "cash"}
+        order_id=payment_req.order_id, amount=float(order["total"]), currency="KMF",
+        payment_status="paid", metadata={"user_id": current_user["user_id"], "cashier_name": current_user.get("email", ""), "method": "cash"}
     )
     transaction_dict = transaction.model_dump()
     transaction_dict["created_at"] = transaction_dict["created_at"].isoformat()
@@ -464,13 +460,9 @@ async def process_cash_payment(payment_req: CashPaymentRequest, current_user: Di
 
 @api_router.get("/cashier/orders", response_model=List[Order])
 async def get_cashier_orders(current_user: Dict = Depends(get_current_user)):
-    """Commandes à encaisser : ready, served, completed — non payées"""
     if current_user["role"] not in ["admin", "cashier"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
-    query = {
-        "status": {"$in": ["ready", "served", "completed"]},
-        "payment_status": "unpaid"
-    }
+    query = {"status": {"$in": ["ready", "served", "completed"]}, "payment_status": "unpaid"}
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     for order in orders:
         if isinstance(order.get("created_at"), str):
@@ -479,19 +471,156 @@ async def get_cashier_orders(current_user: Dict = Depends(get_current_user)):
             order["updated_at"] = datetime.fromisoformat(order["updated_at"])
     return orders
 
-@api_router.get("/cashier/export/csv")
-async def export_cashier_csv(current_user: Dict = Depends(get_current_user)):
-    """Export CSV des transactions pour rapprochement avec logiciel caisse"""
-    if current_user["role"] not in ["admin", "cashier", "accountant"]:
+@api_router.get("/cashier/history")
+async def get_cashier_history(
+    current_user: Dict = Depends(get_current_user),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None)
+):
+    """Historique des ventes payées — filtrable par période"""
+    if current_user["role"] not in ["admin", "cashier"]:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    query = {"payment_status": "paid"}
+    if date_from:
+        query.setdefault("created_at", {})["$gte"] = date_from
+    if date_to:
+        # Inclure toute la journée de date_to
+        try:
+            dt_to = datetime.fromisoformat(date_to)
+            dt_to = dt_to.replace(hour=23, minute=59, second=59)
+            query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
+        except Exception:
+            query.setdefault("created_at", {})["$lte"] = date_to
+    orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    for order in orders:
+        if isinstance(order.get("created_at"), str):
+            order["created_at"] = datetime.fromisoformat(order["created_at"])
+        if isinstance(order.get("updated_at"), str):
+            order["updated_at"] = datetime.fromisoformat(order["updated_at"])
+    total_kmf = sum(o.get("total", 0) for o in orders)
+    return {
+        "orders": orders,
+        "count": len(orders),
+        "total_kmf": round(total_kmf, 2),
+        "total_eur": round(total_kmf / EUR_TO_KMF, 2)
+    }
+
+# ─── COMPTA : STATS + EXPORT CSV ─────────────────────────────────────────────
+
+@api_router.get("/stats/dashboard")
+async def get_dashboard_stats(
+    current_user: Dict = Depends(get_current_user),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None)
+):
+    if current_user["role"] not in ["admin", "accountant"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
 
-    orders = await db.orders.find({"payment_status": "paid"}, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Filtre période pour les stats globales
+    period_query = {"payment_status": "paid"}
+    if date_from:
+        period_query.setdefault("created_at", {})["$gte"] = date_from
+    if date_to:
+        try:
+            dt_to = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
+            period_query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
+        except Exception:
+            period_query.setdefault("created_at", {})["$lte"] = date_to
+
+    total_orders = await db.orders.count_documents({} if not (date_from or date_to) else {k: v for k, v in period_query.items() if k != "payment_status"})
+    today_orders = await db.orders.count_documents({"created_at": {"$gte": today.isoformat()}})
+
+    pipeline = [{"$match": period_query}, {"$group": {"_id": None, "total": {"$sum": "$total"}}}]
+    revenue_result = await db.orders.aggregate(pipeline).to_list(1)
+    total_revenue = revenue_result[0]["total"] if revenue_result else 0.0
+
+    pipeline_today = [{"$match": {"payment_status": "paid", "created_at": {"$gte": today.isoformat()}}}, {"$group": {"_id": None, "total": {"$sum": "$total"}}}]
+    revenue_today_result = await db.orders.aggregate(pipeline_today).to_list(1)
+    today_revenue = revenue_today_result[0]["total"] if revenue_today_result else 0.0
+
+    pending_orders = await db.orders.count_documents({"status": "pending"})
+
+    return {
+        "total_orders": total_orders,
+        "today_orders": today_orders,
+        "total_revenue": round(total_revenue, 2),
+        "today_revenue": round(today_revenue, 2),
+        "pending_orders": pending_orders
+    }
+
+@api_router.get("/accounting/orders")
+async def get_accounting_orders(
+    current_user: Dict = Depends(get_current_user),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None)
+):
+    """Commandes filtrées par période pour la compta"""
+    if current_user["role"] not in ["admin", "accountant"]:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+    query = {}
+    if date_from:
+        query.setdefault("created_at", {})["$gte"] = date_from
+    if date_to:
+        try:
+            dt_to = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
+            query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
+        except Exception:
+            query.setdefault("created_at", {})["$lte"] = date_to
+
+    orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(5000)
+
+    # Enrichir avec le nom du serveur
+    user_cache = {}
+    for order in orders:
+        waiter_email = order.get("waiter_name", "")
+        if waiter_email not in user_cache:
+            user_doc = await db.users.find_one({"email": waiter_email}, {"_id": 0, "name": 1})
+            user_cache[waiter_email] = user_doc["name"] if user_doc else waiter_email
+        order["waiter_display_name"] = user_cache[waiter_email]
+        if isinstance(order.get("created_at"), str):
+            order["created_at"] = datetime.fromisoformat(order["created_at"])
+        if isinstance(order.get("updated_at"), str):
+            order["updated_at"] = datetime.fromisoformat(order["updated_at"])
+
+    return orders
+
+@api_router.get("/accounting/export/csv")
+async def export_accounting_csv(
+    current_user: Dict = Depends(get_current_user),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None)
+):
+    """Export CSV comptabilité avec filtre période + ligne totaux + euros avec virgule"""
+    if current_user["role"] not in ["admin", "accountant"]:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+
+    query = {"payment_status": "paid"}
+    if date_from:
+        query.setdefault("created_at", {})["$gte"] = date_from
+    if date_to:
+        try:
+            dt_to = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
+            query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
+        except Exception:
+            query.setdefault("created_at", {})["$lte"] = date_to
+
+    orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(10000)
+
+    # Enrichir avec noms des serveurs
+    user_cache = {}
+    for order in orders:
+        waiter_email = order.get("waiter_name", "")
+        if waiter_email not in user_cache:
+            user_doc = await db.users.find_one({"email": waiter_email}, {"_id": 0, "name": 1})
+            user_cache[waiter_email] = user_doc["name"] if user_doc else waiter_email
 
     output = io.StringIO()
     writer = csv.writer(output, delimiter=';')
     writer.writerow(["Date", "Heure", "N° Commande", "Table", "Serveur", "Nb Couverts", "Articles", "Total KMF", "Total EUR", "Mode paiement", "Statut"])
 
-    EUR_TO_KMF = 491.96775
+    total_kmf_sum = 0.0
     for order in orders:
         created_at = order.get("created_at", "")
         if isinstance(created_at, str):
@@ -505,46 +634,36 @@ async def export_cashier_csv(current_user: Dict = Depends(get_current_user)):
         else:
             date_str = ""
             time_str = ""
+
+        waiter_name = user_cache.get(order.get("waiter_name", ""), order.get("waiter_name", ""))
         articles = " | ".join([f"{i.get('menu_item_name','')} x{i.get('quantity',1)}" for i in order.get("items", [])])
         total_kmf = order.get("total", 0)
-        total_eur = round(total_kmf / EUR_TO_KMF, 2)
+        total_kmf_sum += total_kmf
+        total_eur_str = fmt_eur(total_kmf)
+
         writer.writerow([date_str, time_str, order.get("id","")[:8].upper(), order.get("table_number",""),
-                         order.get("waiter_name",""), order.get("guests_count",1), articles,
-                         f"{total_kmf:.0f}", f"{total_eur:.2f}", (order.get("payment_method") or "cash").upper(), "PAYÉ"])
+                         waiter_name, order.get("guests_count",1), articles,
+                         f"{total_kmf:.0f}", total_eur_str,
+                         (order.get("payment_method") or "cash").upper(), "PAYÉ"])
+
+    # Ligne de totaux
+    writer.writerow([])
+    writer.writerow(["TOTAL", "", "", "", "", len(orders), "", f"{total_kmf_sum:.0f}", fmt_eur(total_kmf_sum), "", ""])
 
     output.seek(0)
     date_export = datetime.now().strftime("%Y%m%d_%H%M")
+    suffix = f"_{date_from[:10]}_{date_to[:10]}" if date_from and date_to else ""
     return StreamingResponse(
         io.BytesIO(output.getvalue().encode("utf-8-sig")),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=caisse_nassib_{date_export}.csv"}
+        headers={"Content-Disposition": f"attachment; filename=compta_nassib{suffix}_{date_export}.csv"}
     )
-
-# ─── STATS ───────────────────────────────────────────────────────────────────
-
-@api_router.get("/stats/dashboard")
-async def get_dashboard_stats(current_user: Dict = Depends(get_current_user)):
-    if current_user["role"] not in ["admin", "accountant"]:
-        raise HTTPException(status_code=403, detail="Accès refusé")
-    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    total_orders = await db.orders.count_documents({})
-    today_orders = await db.orders.count_documents({"created_at": {"$gte": today.isoformat()}})
-    pipeline = [{"$match": {"payment_status": "paid"}}, {"$group": {"_id": None, "total": {"$sum": "$total"}}}]
-    revenue_result = await db.orders.aggregate(pipeline).to_list(1)
-    total_revenue = revenue_result[0]["total"] if revenue_result else 0.0
-    pipeline_today = [{"$match": {"payment_status": "paid", "created_at": {"$gte": today.isoformat()}}}, {"$group": {"_id": None, "total": {"$sum": "$total"}}}]
-    revenue_today_result = await db.orders.aggregate(pipeline_today).to_list(1)
-    today_revenue = revenue_today_result[0]["total"] if revenue_today_result else 0.0
-    pending_orders = await db.orders.count_documents({"status": "pending"})
-    return {"total_orders": total_orders, "today_orders": today_orders, "total_revenue": round(total_revenue, 2), "today_revenue": round(today_revenue, 2), "pending_orders": pending_orders}
 
 # ─── FACTURE PDF ─────────────────────────────────────────────────────────────
 
-EUR_TO_KMF = 491.96775
-
 def format_currency_pdf(amount_kmf):
     amount_eur = amount_kmf / EUR_TO_KMF
-    return f"{amount_kmf:,.0f} KMF", f"{amount_eur:,.2f} €"
+    return f"{amount_kmf:,.0f} KMF", f"{amount_eur:,.2f} €".replace(".", ",")
 
 @api_router.get("/orders/{order_id}/invoice")
 async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get_current_user)):
@@ -600,13 +719,12 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     elements.append(Paragraph("DÉTAIL DE LA COMMANDE", section_style))
     table_data = [["Article", "Qté", "Prix unit.", "Total KMF", "Total EUR"]]
     for item in order.get("items", []):
-        name = item.get("menu_item_name", "Article")
         qty = item.get("quantity", 1)
         price = item.get("price", 0)
         total = qty * price
         kmf, eur = format_currency_pdf(total)
         price_kmf, _ = format_currency_pdf(price)
-        table_data.append([name, str(qty), price_kmf, kmf, eur])
+        table_data.append([item.get("menu_item_name", "Article"), str(qty), price_kmf, kmf, eur])
     total_amount = order.get("total", 0)
     total_kmf, total_eur = format_currency_pdf(total_amount)
     table_data.append(["", "", "", "", ""])
