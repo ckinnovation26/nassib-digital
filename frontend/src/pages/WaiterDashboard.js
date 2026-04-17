@@ -5,8 +5,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, LogOut, DollarSign, CheckCircle, Clock, Search, FileText } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Plus, LogOut, CheckCircle, Clock, Search, FileText } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
 import { Input } from '../components/ui/input';
 
@@ -15,16 +14,13 @@ const API = `${BACKEND_URL}/api`;
 
 export const WaiterDashboard = () => {
   const { user, logout, token } = useAuth();
-  const navigate = useNavigate();
   const [tables, setTables] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [orders, setOrders] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
   const [cart, setCart] = useState([]);
-  const [guestsCount, setGuestsCount] = useState(1); // Nombre de couverts
+  const [guestsCount, setGuestsCount] = useState(1);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -55,9 +51,7 @@ export const WaiterDashboard = () => {
     const existing = cart.find(c => c.menu_item_id === item.id);
     if (existing) {
       setCart(cart.map(c =>
-        c.menu_item_id === item.id
-          ? { ...c, quantity: c.quantity + 1 }
-          : c
+        c.menu_item_id === item.id ? { ...c, quantity: c.quantity + 1 } : c
       ));
     } else {
       setCart([...cart, {
@@ -76,9 +70,7 @@ export const WaiterDashboard = () => {
   };
 
   const openOrderDialog = (table = null) => {
-    if (table) {
-      setSelectedTable(table);
-    }
+    if (table) setSelectedTable(table);
     setIsOrderDialogOpen(true);
   };
 
@@ -87,12 +79,11 @@ export const WaiterDashboard = () => {
       toast.error('Sélectionnez une table et ajoutez des items');
       return;
     }
-
     try {
       await axios.post(`${API}/orders`, {
         table_id: selectedTable.id,
         items: cart,
-        guests_count: guestsCount  // Envoi du nombre de couverts
+        guests_count: guestsCount
       });
       toast.success('Commande créée!');
       setCart([]);
@@ -125,36 +116,9 @@ export const WaiterDashboard = () => {
     }
   };
 
-  const handlePayment = (orderId) => {
-    const order = orders.find(o => o.id === orderId);
-    setSelectedOrderForPayment(order);
-    setIsPaymentDialogOpen(true);
-  };
-
-  const handleCashPayment = async () => {
-    if (!selectedOrderForPayment) return;
-    try {
-      await axios.post(`${API}/payment/cash`, {
-        order_id: selectedOrderForPayment.id
-      });
-      toast.success('Paiement cash enregistré!');
-      setIsPaymentDialogOpen(false);
-      setSelectedOrderForPayment(null);
-      fetchData();
-    } catch (error) {
-      toast.error('Erreur enregistrement paiement');
-    }
-  };
-
-  const handleCardPayment = () => {
-    if (!selectedOrderForPayment) return;
-    setIsPaymentDialogOpen(false);
-    navigate(`/payment/${selectedOrderForPayment.id}`);
-  };
-
   const downloadInvoice = async (orderId) => {
     try {
-      toast.info('Génération de la facture...');
+      toast.info('Génération du reçu...');
       const response = await axios.get(`${API}/orders/${orderId}/invoice`, {
         responseType: 'blob',
         headers: { Authorization: `Bearer ${token}` }
@@ -167,10 +131,10 @@ export const WaiterDashboard = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success('Facture téléchargée !');
+      toast.success('Reçu téléchargé !');
     } catch (error) {
-      console.error('Erreur téléchargement facture:', error);
-      toast.error('Erreur lors du téléchargement de la facture');
+      console.error('Erreur téléchargement reçu:', error);
+      toast.error('Erreur lors du téléchargement du reçu');
     }
   };
 
@@ -198,7 +162,6 @@ export const WaiterDashboard = () => {
     }
   };
 
-  // --- TABLE STATUS HELPERS ---
   const getTableStyle = (table) => {
     switch (table.status) {
       case 'free':
@@ -217,11 +180,7 @@ export const WaiterDashboard = () => {
       case 'free':
         return <span className="text-emerald-400">✓ Libre</span>;
       case 'partial':
-        return (
-          <span className="text-amber-400">
-            ◑ Partielle ({table.occupied_seats || 0}/{table.capacity})
-          </span>
-        );
+        return <span className="text-amber-400">◑ Partielle ({table.occupied_seats || 0}/{table.capacity})</span>;
       case 'occupied':
         return <span className="text-rose-400">● Occupée</span>;
       default:
@@ -230,7 +189,6 @@ export const WaiterDashboard = () => {
   };
 
   const isTableClickable = (table) => table.status === 'free' || table.status === 'partial';
-  // --- FIN TABLE STATUS HELPERS ---
 
   if (loading) {
     return (
@@ -248,19 +206,14 @@ export const WaiterDashboard = () => {
             <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-amber-500">NASSIB</h1>
             <p className="text-xs text-slate-400 font-medium tracking-wide">Serveur: {user?.name}</p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={logout}
-            data-testid="logout-button"
-            className="text-slate-400 hover:text-rose-400 hover:bg-rose-500/10"
-          >
+          <Button variant="ghost" size="sm" onClick={logout} data-testid="logout-button" className="text-slate-400 hover:text-rose-400 hover:bg-rose-500/10">
             <LogOut className="w-5 h-5" />
           </Button>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto p-4 space-y-6">
+        {/* Tables */}
         <section data-testid="tables-section">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold text-slate-50">Tables</h2>
@@ -281,9 +234,7 @@ export const WaiterDashboard = () => {
                 <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div className="relative text-center">
                   <div className="text-4xl font-black text-slate-50 font-mono tracking-wider drop-shadow-lg">{table.number}</div>
-                  <div className="text-xs font-bold mt-2 uppercase tracking-wide">
-                    {getTableStatusLabel(table)}
-                  </div>
+                  <div className="text-xs font-bold mt-2 uppercase tracking-wide">{getTableStatusLabel(table)}</div>
                   <div className="text-xs text-slate-500 mt-1">{table.capacity} pers.</div>
                 </div>
               </Card>
@@ -291,30 +242,21 @@ export const WaiterDashboard = () => {
           </div>
         </section>
 
+        {/* Commandes */}
         <section data-testid="orders-section">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold text-slate-50">Commandes actives</h2>
             <Dialog open={isOrderDialogOpen} onOpenChange={(open) => {
               setIsOrderDialogOpen(open);
-              if (!open) {
-                setSelectedTable(null);
-                setCart([]);
-                setGuestsCount(1);
-                setSearchQuery('');
-              }
+              if (!open) { setSelectedTable(null); setCart([]); setGuestsCount(1); setSearchQuery(''); }
             }}>
               <DialogTrigger asChild>
                 <Button
                   data-testid="new-order-button"
-                  onClick={() => {
-                    setSelectedTable(null);
-                    setCart([]);
-                    setGuestsCount(1);
-                  }}
+                  onClick={() => { setSelectedTable(null); setCart([]); setGuestsCount(1); }}
                   className="h-12 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-lg shadow-xl shadow-rose-500/40 transition-all hover:scale-105"
                 >
-                  <Plus className="w-6 h-6 mr-2" />
-                  NOUVELLE COMMANDE
+                  <Plus className="w-6 h-6 mr-2" />NOUVELLE COMMANDE
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-800" data-testid="order-dialog">
@@ -324,23 +266,18 @@ export const WaiterDashboard = () => {
                 </DialogHeader>
                 <div className="space-y-4">
 
-                  {/* Sélection table */}
+                  {/* Sélection table — fond sombre corrigé */}
                   <div>
                     <label className="text-sm text-slate-300 mb-2 block font-semibold">
                       Table {selectedTable ? `✓ ${selectedTable.number} sélectionnée` : '⚠️ SÉLECTIONNEZ UNE TABLE'}
                     </label>
                     <select
                       data-testid="table-select"
-                      className={`w-full border rounded-md px-3 py-3 text-base font-medium ${
-                        selectedTable
-                          ? 'bg-emerald-900/30 border-emerald-600 text-emerald-300'
-                          : 'bg-rose-900/30 border-rose-600 text-rose-300 animate-pulse'
-                      }`}
+                      className="w-full bg-slate-950 border border-slate-700 text-slate-50 rounded-md px-3 py-3 text-base font-medium focus:border-rose-500 focus:outline-none"
                       value={selectedTable?.id || ''}
                       onChange={(e) => {
                         const t = tables.find(t => t.id === e.target.value);
                         setSelectedTable(t);
-                        // Réinitialiser guests_count selon capacité restante
                         if (t) {
                           const remaining = t.capacity - (t.occupied_seats || 0);
                           setGuestsCount(Math.max(1, Math.min(1, remaining)));
@@ -369,25 +306,15 @@ export const WaiterDashboard = () => {
                         )}
                       </label>
                       <div className="flex items-center gap-3">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => setGuestsCount(Math.max(1, guestsCount - 1))}
-                          className="w-10 h-10 text-xl text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg"
-                        >−</Button>
+                        <Button type="button" variant="ghost" onClick={() => setGuestsCount(Math.max(1, guestsCount - 1))} className="w-10 h-10 text-xl text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg">−</Button>
                         <span className="text-2xl font-black text-slate-50 w-8 text-center">{guestsCount}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
+                        <Button type="button" variant="ghost"
                           onClick={() => {
                             const maxSeats = selectedTable.capacity - (selectedTable.occupied_seats || 0);
                             setGuestsCount(Math.min(guestsCount + 1, maxSeats));
                           }}
-                          className="w-10 h-10 text-xl text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg"
-                        >+</Button>
-                        <span className="text-xs text-slate-500 ml-1">
-                          sur {selectedTable.capacity} places
-                        </span>
+                          className="w-10 h-10 text-xl text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg">+</Button>
+                        <span className="text-xs text-slate-500 ml-1">sur {selectedTable.capacity} places</span>
                       </div>
                     </div>
                   )}
@@ -399,17 +326,14 @@ export const WaiterDashboard = () => {
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                       <Input
                         type="text"
-                        placeholder="Rechercher un plat (ex: viande, poisson, pizza...)"
+                        placeholder="Rechercher un plat..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         data-testid="menu-search"
                         className="pl-10 bg-slate-950 border-slate-700 text-slate-50 placeholder:text-slate-500 focus:border-rose-500"
                       />
                       {searchQuery && (
-                        <button
-                          onClick={() => setSearchQuery('')}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-rose-400"
-                        >✕</button>
+                        <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-rose-400">✕</button>
                       )}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2" data-testid="menu-items">
@@ -418,11 +342,7 @@ export const WaiterDashboard = () => {
                         .filter(item => {
                           if (!searchQuery.trim()) return true;
                           const query = searchQuery.toLowerCase();
-                          return (
-                            item.name.toLowerCase().includes(query) ||
-                            item.category.toLowerCase().includes(query) ||
-                            (item.description && item.description.toLowerCase().includes(query))
-                          );
+                          return item.name.toLowerCase().includes(query) || item.category.toLowerCase().includes(query) || (item.description && item.description.toLowerCase().includes(query));
                         })
                         .map(item => (
                           <Card
@@ -433,11 +353,7 @@ export const WaiterDashboard = () => {
                           >
                             {item.image_url && (
                               <div className="h-32 overflow-hidden">
-                                <img
-                                  src={item.image_url}
-                                  alt={item.name}
-                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                                />
+                                <img src={item.image_url} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
                               </div>
                             )}
                             <div className="p-3">
@@ -453,23 +369,6 @@ export const WaiterDashboard = () => {
                             </div>
                           </Card>
                         ))}
-                      {searchQuery && menuItems.filter(item => item.available).filter(item => {
-                        const query = searchQuery.toLowerCase();
-                        return (
-                          item.name.toLowerCase().includes(query) ||
-                          item.category.toLowerCase().includes(query) ||
-                          (item.description && item.description.toLowerCase().includes(query))
-                        );
-                      }).length === 0 && (
-                        <div className="col-span-2 text-center py-8 text-slate-400">
-                          <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                          <p>Aucun plat trouvé pour "{searchQuery}"</p>
-                          <button
-                            onClick={() => setSearchQuery('')}
-                            className="mt-2 text-rose-400 hover:text-rose-300 text-sm underline"
-                          >Effacer la recherche</button>
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -480,17 +379,10 @@ export const WaiterDashboard = () => {
                       <div className="space-y-2" data-testid="cart-items">
                         {cart.map(item => (
                           <div key={item.menu_item_id} className="flex justify-between items-center bg-slate-800 p-2 rounded-md">
-                            <div className="text-sm text-slate-50">
-                              {item.menu_item_name} x{item.quantity}
-                            </div>
+                            <div className="text-sm text-slate-50">{item.menu_item_name} x{item.quantity}</div>
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-mono text-slate-400">{formatCurrency(item.price * item.quantity)}</span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => removeFromCart(item.menu_item_id)}
-                                className="text-rose-600 hover:text-rose-700 h-6 px-2"
-                              >✕</Button>
+                              <Button size="sm" variant="ghost" onClick={() => removeFromCart(item.menu_item_id)} className="text-rose-600 hover:text-rose-700 h-6 px-2">✕</Button>
                             </div>
                           </div>
                         ))}
@@ -504,12 +396,6 @@ export const WaiterDashboard = () => {
                     </div>
                   )}
 
-                  {!selectedTable && cart.length > 0 && (
-                    <div className="mb-3 p-3 bg-rose-900/20 border-2 border-rose-600/50 rounded-lg text-center">
-                      <p className="text-rose-400 font-bold text-sm">⚠️ Sélectionnez une table ci-dessus pour continuer</p>
-                    </div>
-                  )}
-
                   <Button
                     onClick={createOrder}
                     data-testid="create-order-button"
@@ -520,11 +406,7 @@ export const WaiterDashboard = () => {
                     }`}
                     disabled={!selectedTable || cart.length === 0}
                   >
-                    {!selectedTable
-                      ? '⚠️ SÉLECTIONNEZ UNE TABLE'
-                      : cart.length === 0
-                        ? '⚠️ AJOUTEZ DES ITEMS'
-                        : `✓ CRÉER LA COMMANDE (${guestsCount} couvert${guestsCount > 1 ? 's' : ''})`}
+                    {!selectedTable ? '⚠️ SÉLECTIONNEZ UNE TABLE' : cart.length === 0 ? '⚠️ AJOUTEZ DES ITEMS' : `✓ CRÉER LA COMMANDE (${guestsCount} couvert${guestsCount > 1 ? 's' : ''})`}
                   </Button>
                 </div>
               </DialogContent>
@@ -563,7 +445,7 @@ export const WaiterDashboard = () => {
 
                   <div className="space-y-2 mb-4 bg-slate-950/50 rounded-lg p-3">
                     {order.items.map((item, idx) => (
-                      <div key={idx} className="text-sm text-slate-300 flex justify-between items-center hover:text-slate-50 transition-colors">
+                      <div key={idx} className="text-sm text-slate-300 flex justify-between items-center">
                         <span className="font-medium">{item.menu_item_name} <span className="text-amber-500 font-bold">x{item.quantity}</span></span>
                         <span className="font-mono font-bold text-rose-400">{formatCurrency(item.price * item.quantity)}</span>
                       </div>
@@ -571,31 +453,32 @@ export const WaiterDashboard = () => {
                   </div>
 
                   <div className="flex gap-2">
+                    {/* Serveur voit uniquement : SERVIE quand prête */}
                     {order.status === 'ready' && (
                       <Button
                         onClick={() => markAsServed(order.id)}
                         data-testid={`mark-served-${order.id}`}
                         className="flex-1 h-12 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white font-bold text-base shadow-lg shadow-purple-500/30"
                       >
-                        <CheckCircle className="w-5 h-5 mr-2" />
-                        SERVIE
+                        <CheckCircle className="w-5 h-5 mr-2" />SERVIE
                       </Button>
                     )}
+
+                    {/* Servie et non payée : message "En attente du caissier" */}
                     {order.status === 'served' && order.payment_status !== 'paid' && (
-                      <Button
-                        onClick={() => handlePayment(order.id)}
-                        data-testid={`pay-button-${order.id}`}
-                        className="flex-1 h-12 bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold text-base shadow-lg shadow-rose-500/30"
-                      >
-                        PAYER
-                      </Button>
+                      <div className="flex-1 h-12 flex items-center justify-center gap-2 text-amber-400 text-sm font-bold bg-amber-500/10 rounded-lg border-2 border-amber-500/30">
+                        <Clock className="w-5 h-5" />
+                        EN ATTENTE CAISSIER
+                      </div>
                     )}
+
+                    {/* Payée : bouton reçu + terminer */}
                     {order.payment_status === 'paid' && order.status !== 'completed' && (
                       <>
                         <Button
                           onClick={() => downloadInvoice(order.id)}
                           data-testid={`invoice-${order.id}`}
-                          className="h-12 px-4 bg-slate-700 hover:bg-slate-600 text-white font-bold text-base"
+                          className="h-12 px-4 bg-slate-700 hover:bg-slate-600 text-white font-bold"
                         >
                           <FileText className="w-5 h-5" />
                         </Button>
@@ -604,21 +487,20 @@ export const WaiterDashboard = () => {
                           data-testid={`complete-order-${order.id}`}
                           className="flex-1 h-12 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-base shadow-lg shadow-emerald-500/30"
                         >
-                          <CheckCircle className="w-5 h-5 mr-2" />
-                          TERMINER
+                          <CheckCircle className="w-5 h-5 mr-2" />TERMINER
                         </Button>
                       </>
                     )}
+
                     {order.status === 'pending' && (
                       <div className="flex-1 h-12 flex items-center justify-center gap-2 text-amber-500 text-sm font-bold bg-amber-500/10 rounded-lg border-2 border-amber-500/30">
-                        <Clock className="w-5 h-5" />
-                        EN ATTENTE
+                        <Clock className="w-5 h-5" />EN ATTENTE
                       </div>
                     )}
-                    {(order.status === 'in_progress' || order.status === 'served') && order.payment_status !== 'paid' && (
+
+                    {order.status === 'in_progress' && (
                       <div className="flex-1 h-12 flex items-center justify-center gap-2 text-blue-400 text-sm font-bold bg-blue-500/10 rounded-lg border-2 border-blue-500/30">
-                        <Clock className="w-5 h-5" />
-                        {order.status === 'in_progress' ? 'EN PRÉPARATION' : 'EN COURS'}
+                        <Clock className="w-5 h-5" />EN PRÉPARATION
                       </div>
                     )}
                   </div>
@@ -627,41 +509,6 @@ export const WaiterDashboard = () => {
             ))}
           </div>
         </section>
-
-        {/* Dialog paiement */}
-        <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
-          <DialogContent className="max-w-md bg-slate-900 border-slate-800" data-testid="payment-choice-dialog">
-            <DialogHeader>
-              <DialogTitle className="text-slate-50 text-xl">Mode de paiement</DialogTitle>
-              <DialogDescription className="text-slate-400">
-                Table {selectedOrderForPayment?.table_number} - {selectedOrderForPayment && formatCurrency(selectedOrderForPayment.total)}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3 mt-4">
-              <Button
-                onClick={handleCashPayment}
-                data-testid="cash-payment-button"
-                className="w-full h-16 bg-green-600 hover:bg-green-700 text-white font-semibold text-lg"
-              >
-                💵 Paiement Cash (KMF)
-              </Button>
-              <Button
-                onClick={handleCardPayment}
-                data-testid="card-payment-button"
-                className="w-full h-16 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-lg"
-              >
-                💳 Paiement par Carte
-              </Button>
-              <Button
-                onClick={() => setIsPaymentDialogOpen(false)}
-                variant="ghost"
-                className="w-full text-slate-400 hover:text-slate-300"
-              >
-                Annuler
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </main>
     </div>
   );
