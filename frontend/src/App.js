@@ -7,6 +7,7 @@ import { WaiterDashboard } from './pages/WaiterDashboard';
 import { KitchenDashboard } from './pages/KitchenDashboard';
 import { AccountingDashboard } from './pages/AccountingDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
+import { CashierDashboard } from './pages/CashierDashboard';
 import { Payment } from './pages/Payment';
 import { Toaster } from 'sonner';
 
@@ -26,12 +27,14 @@ const RoleBasedRedirect = () => {
   }
 
   switch (user.role) {
-    case 'chef':
+    case 'cook':
       return <Navigate to="/kitchen" replace />;
     case 'accountant':
       return <Navigate to="/accounting" replace />;
     case 'admin':
       return <Navigate to="/admin" replace />;
+    case 'cashier':
+      return <Navigate to="/cashier" replace />;
     default:
       return <Navigate to="/waiter" replace />;
   }
@@ -62,7 +65,7 @@ function App() {
             <Route
               path="/kitchen"
               element={
-                <ProtectedRoute roles={['chef', 'admin']}>
+                <ProtectedRoute roles={['cook', 'admin']}>
                   <KitchenDashboard />
                 </ProtectedRoute>
               }
@@ -80,6 +83,14 @@ function App() {
               element={
                 <ProtectedRoute roles={['admin']}>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cashier"
+              element={
+                <ProtectedRoute roles={['cashier', 'admin']}>
+                  <CashierDashboard />
                 </ProtectedRoute>
               }
             />
