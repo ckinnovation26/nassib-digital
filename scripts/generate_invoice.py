@@ -100,7 +100,7 @@ def create_invoice():
     # Vendeur et Client
     parties_data = [
         [
-            Paragraph("<b>VENDEUR</b><br/><br/>Emergent Digital Solutions<br/>Services de développement logiciel<br/>contact@emergent.com", normal_style),
+            Paragraph("<b>VENDEUR</b><br/><br/>Nassib Digital<br/>Services de développement logiciel<br/>contact@nassib-digital.com", normal_style),
             Paragraph("<b>CLIENT</b><br/><br/>Restaurant Nassib<br/>Chaîne de restauration<br/>Comores<br/>administration@nassib.com", normal_style)
         ]
     ]

@@ -113,7 +113,7 @@ Créez vos propres comptes via l'interface d'inscription ou utilisez :
 ```env
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=test_database
-STRIPE_API_KEY=sk_test_emergent
+STRIPE_API_KEY=sk_test_votre_cle_stripe
 JWT_SECRET=votre_secret_jwt
 JWT_ALGORITHM=HS256
 JWT_EXPIRATION_HOURS=168
@@ -195,7 +195,7 @@ L'application utilise un système de polling pour maintenir les données à jour
 - **Framework** : FastAPI
 - **Base de données** : MongoDB (Motor async)
 - **Auth** : JWT (PyJWT + passlib)
-- **Paiements** : Stripe (emergentintegrations)
+- **Paiements** : Stripe
 
 ### Frontend
 - **Framework** : React 19
