@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
-import { LogOut, Timer, CheckCircle, AlertTriangle, TrendingUp, TrendingDown, Filter, Zap, Turtle } from 'lucide-react';
+import { LogOut, Timer, CheckCircle, AlertTriangle, TrendingUp, TrendingDown, Filter, Zap, Turtle, ArrowLeft } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -77,9 +77,14 @@ export const KitchenPerformance = () => {
             <h1 className="text-2xl font-bold text-slate-50">Performance Cuisine — Nassib</h1>
             <p className="text-sm text-slate-400 mt-1">Admin: {user?.name}</p>
           </div>
-          <Button variant="ghost" onClick={logout} className="text-slate-400 hover:text-rose-600">
-            <LogOut className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={() => window.location.href = '/admin'} className="text-slate-400 hover:text-slate-100">
+              <ArrowLeft className="w-5 h-5 mr-1" /> Admin
+            </Button>
+            <Button variant="ghost" onClick={logout} className="text-slate-400 hover:text-rose-600">
+              <LogOut className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </header>
 
