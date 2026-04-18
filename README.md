@@ -91,17 +91,17 @@ sudo supervisorctl status
 Créez vos propres comptes via l'interface d'inscription ou utilisez :
 
 **Serveur**
-- Email : info@ckinnovation.fr
+- Email : serveur@nassib.com
 - Password : password123
 - Rôle : waiter
 
 **Cuisinier**
-- Email : info@ckinnovation.fr  
+- Email : chef@nassib.com  
 - Password : password123
 - Rôle : chef
 
 **Comptable**
-- Email : info@ckinnovation.fr
+- Email : comptable@nassib.com
 - Password : password123
 - Rôle : accountant
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Générateur de facture PDF pour l'application CK Innovation
+Générateur de facture PDF pour l'application Nassib Digital
 """
 
 from reportlab.lib import colors
@@ -101,7 +101,7 @@ def create_invoice():
     parties_data = [
         [
             Paragraph("<b>VENDEUR</b><br/><br/>CK Innovation<br/>Services de développement logiciel<br/>info@ckinnovation.fr", normal_style),
-            Paragraph("<b>CLIENT</b><br/><br/>Restaurant Nassib<br/>Chaîne de restauration<br/>Comores<br/>info@ckinnovation.fr", normal_style)
+            Paragraph("<b>CLIENT</b><br/><br/>Restaurant Nassib<br/>Chaîne de restauration<br/>Comores<br/>administration@nassib.com", normal_style)
         ]
     ]
     
@@ -291,7 +291,7 @@ def create_invoice():
     )
     
     elements.append(Paragraph(
-        f"Facture générée le {invoice_date} | CK Innovation - Application de gestion de restaurant",
+        f"Facture générée le {invoice_date} | Nassib Digital - Application de gestion de restaurant",
         footer_style
     ))
     
