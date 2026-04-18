@@ -218,6 +218,7 @@ export const AccountingDashboard = () => {
                     <th className="text-left text-sm font-semibold text-slate-400 pb-3">ID</th>
                     <th className="text-left text-sm font-semibold text-slate-400 pb-3">Table</th>
                     <th className="text-left text-sm font-semibold text-slate-400 pb-3">Serveur</th>
+                    <th className="text-left text-sm font-semibold text-slate-400 pb-3">Caissier</th>
                     <th className="text-left text-sm font-semibold text-slate-400 pb-3">Total KMF</th>
                     <th className="text-left text-sm font-semibold text-slate-400 pb-3">Total EUR</th>
                     <th className="text-left text-sm font-semibold text-slate-400 pb-3">Statut</th>
@@ -231,6 +232,7 @@ export const AccountingDashboard = () => {
                       <td className="py-3 text-sm font-mono text-slate-400">{order.id.slice(0, 8)}</td>
                       <td className="py-3 text-sm font-mono font-bold text-slate-50">{order.table_number}</td>
                       <td className="py-3 text-sm text-slate-300">{order.waiter_display_name || order.waiter_name}</td>
+                      <td className="py-3 text-sm text-slate-300">{order.cashier_name || '—'}</td>
                       <td className="py-3 text-sm font-mono font-bold text-rose-600">{formatCurrency(order.total)}</td>
                       <td className="py-3 text-sm font-mono text-slate-400">{formatEur(order.total)}</td>
                       <td className="py-3 text-sm">
@@ -258,7 +260,7 @@ export const AccountingDashboard = () => {
                 {orders.length > 0 && (
                   <tfoot>
                     <tr className="border-t-2 border-slate-700">
-                      <td colSpan={3} className="py-3 text-sm font-bold text-slate-300">TOTAL ({paidOrders.length} payées)</td>
+                      <td colSpan={4} className="py-3 text-sm font-bold text-slate-300">TOTAL ({paidOrders.length} payées)</td>
                       <td className="py-3 text-sm font-bold font-mono text-rose-500">{formatCurrency(totalKmf)}</td>
                       <td className="py-3 text-sm font-bold font-mono text-slate-300">{formatEur(totalKmf)}</td>
                       <td colSpan={3}></td>
