@@ -4,7 +4,7 @@ from datetime import datetime
 import json
 
 class NassibAPITester:
-    def __init__(self, base_url="https://nassib-digital.preview.emergentagent.com"):
+    def __init__(self, base_url="https://illustrious-success-production-597f.up.railway.app"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.token = None

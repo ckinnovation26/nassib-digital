@@ -43,7 +43,7 @@ export const Login = () => {
         <CardHeader className="space-y-3">
           <div className="flex justify-center mb-2">
             <img 
-              src="/LOGO NASSIB.jpeg"
+              src="https://illustrious-success-production-597f.up.railway.app/LOGO%20NASSIB.jpeg"
               alt="Logo Nassib"
               className="w-32 h-32 object-contain"
             />

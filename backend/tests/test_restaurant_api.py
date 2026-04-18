@@ -8,7 +8,7 @@ import requests
 import os
 from datetime import datetime
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://nassib-digital.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://illustrious-success-production-597f.up.railway.app').rstrip('/')
 API_URL = f"{BASE_URL}/api"
 
 # Test credentials from requirements

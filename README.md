@@ -121,7 +121,7 @@ JWT_EXPIRATION_HOURS=168
 
 **Frontend** (`/app/frontend/.env`)
 ```env
-REACT_APP_BACKEND_URL=https://votre-url.preview.emergentagent.com
+REACT_APP_BACKEND_URL=https://illustrious-success-production-597f.up.railway.app
 ```
 
 ## 📊 Données Seedées
