@@ -429,7 +429,7 @@ async def process_cash_payment(payment_req: CashPaymentRequest, current_user: Di
     )
     transaction = PaymentTransaction(
         order_id=payment_req.order_id, amount=float(order["total"]), currency="KMF",
-        payment_status="paid", metadata={"user_id": current_user["user_id"], "method": "cash"}
+        payment_status="paid", metadata={"user_id": current_user["user_id"], "cashier_name": current_user.get("email", ""), "method": "cash"}
     )
     transaction_dict = transaction.model_dump()
     transaction_dict["created_at"] = transaction_dict["created_at"].isoformat()
@@ -527,6 +527,21 @@ async def get_accounting_orders(
             user_doc = await db.users.find_one({"email": waiter_email}, {"_id": 0, "name": 1})
             user_cache[waiter_email] = user_doc["name"] if user_doc else waiter_email
         order["waiter_display_name"] = user_cache[waiter_email]
+
+        # Récupérer le nom du caissier depuis la transaction de paiement
+        if order.get("payment_status") == "paid":
+            transaction = await db.payment_transactions.find_one({"order_id": order.get("id")}, {"_id": 0, "metadata": 1})
+            if transaction and transaction.get("metadata", {}).get("cashier_name"):
+                cashier_email = transaction["metadata"]["cashier_name"]
+                if cashier_email not in user_cache:
+                    user_doc = await db.users.find_one({"email": cashier_email}, {"_id": 0, "name": 1})
+                    user_cache[cashier_email] = user_doc["name"] if user_doc else cashier_email
+                order["cashier_name"] = user_cache[cashier_email]
+            else:
+                order["cashier_name"] = "—"
+        else:
+            order["cashier_name"] = "—"
+
         if isinstance(order.get("created_at"), str): order["created_at"] = datetime.fromisoformat(order["created_at"])
         if isinstance(order.get("updated_at"), str): order["updated_at"] = datetime.fromisoformat(order["updated_at"])
     return orders
@@ -700,7 +715,7 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     elements = []
     try:
         import urllib.request
-        logo_url = "https://customer-assets.emergentagent.com/job_nassib-digital/artifacts/et6rs79p_IMG_9019.jpeg"
+        logo_url = "https://illustrious-success-production-597f.up.railway.app/LOGO%20NASSIB.jpeg"
         logo_data = io.BytesIO(urllib.request.urlopen(logo_url).read())
         from reportlab.platypus import Image as PDFImage
         logo = PDFImage(logo_data, width=3*cm, height=3*cm)
