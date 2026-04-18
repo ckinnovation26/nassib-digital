@@ -470,7 +470,7 @@ export const AdminDashboard = () => {
                   </div>
                   <div>
                     <Label className="text-slate-300">Email</Label>
-                    <Input type="email" value={userForm.email} onChange={(e) => setUserForm({...userForm, email: e.target.value})} placeholder="email@nassib.com" disabled={!!editingUser} className="bg-slate-950 border-slate-800 text-slate-50 disabled:opacity-50" />
+                    <Input type="email" value={userForm.email} onChange={(e) => setUserForm({...userForm, email: e.target.value})} placeholder="email@ckinnovation.fr" disabled={!!editingUser} className="bg-slate-950 border-slate-800 text-slate-50 disabled:opacity-50" />
                   </div>
                   <div>
                     <Label className="text-slate-300">{editingUser ? 'Nouveau mot de passe (laisser vide pour ne pas changer)' : 'Mot de passe'}</Label>

@@ -453,8 +453,8 @@ function setupDevServer(config) {
             // Commit the change to git
             const timestamp = Date.now();
             try {
-              execSync(`git -c user.name="visual-edit" -c user.email="support@nassib-digital.com" add "${result.file}"`);
-              execSync(`git -c user.name="visual-edit" -c user.email="support@nassib-digital.com" commit -m "visual_edit_variable_${timestamp}"`);
+              execSync(`git -c user.name="visual-edit" -c user.email="info@ckinnovation.fr" add "${result.file}"`);
+              execSync(`git -c user.name="visual-edit" -c user.email="info@ckinnovation.fr" commit -m "visual_edit_variable_${timestamp}"`);
             } catch (gitError) {
               console.error(`Git commit failed for variableEdit: ${gitError.message}`);
             }
@@ -896,8 +896,8 @@ function setupDevServer(config) {
           const timestamp = Date.now();
           try {
             // Use -c flag for per-invocation git config to avoid modifying any config
-            execSync(`git -c user.name="visual-edit" -c user.email="support@nassib-digital.com" add "${targetFile}"`);
-            execSync(`git -c user.name="visual-edit" -c user.email="support@nassib-digital.com" commit -m "visual_edit_${timestamp}"`);
+            execSync(`git -c user.name="visual-edit" -c user.email="info@ckinnovation.fr" add "${targetFile}"`);
+            execSync(`git -c user.name="visual-edit" -c user.email="info@ckinnovation.fr" commit -m "visual_edit_${timestamp}"`);
           } catch (gitError) {
             console.error(`Git commit failed: ${gitError.message}`);
             // Continue even if git fails - file write succeeded
