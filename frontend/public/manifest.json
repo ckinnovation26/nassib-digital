@@ -1,4 +1,4 @@
- {
+{
     "name": "NASSIB Restaurant",
     "short_name": "Nassib",
     "description": "Système de gestion restaurant By CK Innovation",
@@ -9,9 +9,14 @@
     "orientation": "any",
     "icons": [
       {
-        "src": "/favicon.ico",
-        "sizes": "64x64",
-        "type": "image/x-icon"
+        "src": "/LOGO%20NASSIB.jpeg",
+        "sizes": "192x192",
+        "type": "image/jpeg"
+      },
+      {
+        "src": "/LOGO%20NASSIB.jpeg",
+        "sizes": "512x512",
+        "type": "image/jpeg"
       }
     ]
   }
