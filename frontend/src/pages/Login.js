@@ -45,7 +45,7 @@ export const Login = () => {
             <img 
               src="https://illustrious-success-production-597f.up.railway.app/LOGO%20NASSIB.jpeg"
               alt="Logo Nassib"
-              className="w-32 h-32 object-contain"
+              className="w-48 h-48 object-contain"
             />
           </div>
           <CardTitle className="text-2xl text-center text-slate-50">Connexion</CardTitle>
