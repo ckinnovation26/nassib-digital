@@ -10,6 +10,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { CashierDashboard } from './pages/CashierDashboard';
 import { KitchenPerformance } from './pages/KitchenPerformance';
 import { Payment } from './pages/Payment';
+import { MenuPublic } from './pages/MenuPublic';
 import { Toaster } from 'sonner';
 
 const RoleBasedRedirect = () => {
@@ -36,6 +37,7 @@ function App() {
         <AuthProvider>
           <Toaster position="top-right" toastOptions={{ className: 'bg-slate-900 border-slate-800 text-slate-50' }} />
           <Routes>
+            <Route path="/menu" element={<MenuPublic />} />
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<RoleBasedRedirect />} />
             <Route path="/waiter" element={<ProtectedRoute roles={['waiter', 'admin']}><WaiterDashboard /></ProtectedRoute>} />
