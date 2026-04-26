@@ -133,8 +133,13 @@ export const AdminDashboard = () => {
   };
 
   const saveMenuItem = async () => {
+    if (!menuForm.name.trim()) { toast.error('Le nom est requis'); return; }
+    const price = parseFloat(menuForm.price);
+    if (!menuForm.price || isNaN(price) || price <= 0) { toast.error('Le tarif est requis et doit être supérieur à 0'); return; }
+    if (!menuForm.category) { toast.error('La catégorie est requise'); return; }
+    const prepTime = parseInt(menuForm.preparation_time, 10);
     try {
-      const data = { ...menuForm, price: parseFloat(menuForm.price), preparation_time: parseInt(menuForm.preparation_time) };
+      const data = { ...menuForm, price, preparation_time: isNaN(prepTime) ? 0 : prepTime };
       if (editingMenuItem) { await axios.put(`${API}/menu/${editingMenuItem.id}`, data, authHeaders); toast.success('Plat modifié !'); }
       else { await axios.post(`${API}/menu`, data, authHeaders); toast.success('Plat ajouté !'); }
       setIsMenuDialogOpen(false);
