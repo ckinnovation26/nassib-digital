@@ -7,7 +7,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 import uuid
 from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
@@ -127,7 +127,7 @@ class OrderCreate(BaseModel):
     guests_count: int = 1
 
 class OrderStatusUpdate(BaseModel):
-    status: str
+    status: Literal["pending", "in_progress", "ready", "served", "completed", "cancelled"]
     extra_minutes: Optional[int] = None
 
 class PaymentTransaction(BaseModel):
@@ -352,19 +352,20 @@ async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get
     table = await db.tables.find_one({"id": order_data.table_id}, {"_id": 0})
     if not table:
         raise HTTPException(status_code=404, detail="Table non trouvée")
-    total = sum(item.quantity * item.price for item in order_data.items)
     max_prep_time = 15
     items_with_prep_time = []
     for item in order_data.items:
         item_dict = item.model_dump()
         menu_item = await db.menu_items.find_one({"id": item.menu_item_id}, {"_id": 0})
         if menu_item:
+            item_dict["price"] = menu_item["price"]
             prep_time = menu_item.get("preparation_time", 15)
             item_dict["preparation_time"] = prep_time
             if prep_time > max_prep_time: max_prep_time = prep_time
         else:
             item_dict["preparation_time"] = 15
         items_with_prep_time.append(item_dict)
+    total = sum(i["quantity"] * i["price"] for i in items_with_prep_time)
     order = Order(
         table_id=order_data.table_id, table_number=table["number"],
         waiter_id=current_user["user_id"], waiter_name=current_user.get("name") or current_user.get("email", "Unknown"),
@@ -403,6 +404,10 @@ async def get_order(order_id: str, current_user: Dict = Depends(get_current_user
 async def update_order_status(order_id: str, status_data: OrderStatusUpdate, current_user: Dict = Depends(get_current_user)):
     if current_user["role"] not in ["admin", "cook", "waiter", "cashier"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
+    if status_data.status == "cancelled":
+        order_check = await db.orders.find_one({"id": order_id}, {"_id": 0, "payment_status": 1, "status": 1})
+        if order_check and order_check.get("payment_status") == "unpaid" and order_check.get("status") in ["served", "ready"]:
+            raise HTTPException(status_code=400, detail="Impossible d'annuler une commande servie non payée — encaisser d'abord")
     update_data = {"status": status_data.status, "updated_at": datetime.now(timezone.utc).isoformat()}
     if status_data.status == "in_progress":
         update_data["preparation_started_at"] = datetime.now(timezone.utc).isoformat()
