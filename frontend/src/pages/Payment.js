@@ -1,41 +1,26 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { toast } from 'sonner';
-import { Loader2, CheckCircle, XCircle, CreditCard } from 'lucide-react';
+import { Loader2, CheckCircle, CreditCard } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-// Taux de conversion KMF → EUR
 const KMF_TO_EUR_RATE = 491.96775;
-
-const convertKMFtoEUR = (kmf) => {
-  return (kmf / KMF_TO_EUR_RATE).toFixed(2);
-};
+const convertKMFtoEUR = (kmf) => (kmf / KMF_TO_EUR_RATE).toFixed(2);
 
 export const Payment = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
-  const [sessionId, setSessionId] = useState(null);
-  const [pollingStatus, setPollingStatus] = useState(false);
-  const pollingTimerRef = useRef(null);
 
   useEffect(() => {
     fetchOrder();
-    const urlParams = new URLSearchParams(window.location.search);
-    const sid = urlParams.get('session_id');
-    if (sid) {
-      setSessionId(sid);
-      pollPaymentStatus(sid);
-    }
-    return () => { if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current); };
   }, [orderId]);
 
   const fetchOrder = async () => {
@@ -50,78 +35,10 @@ export const Payment = () => {
     }
   };
 
-  const pollPaymentStatus = async (sid, attempts = 0) => {
-    if (attempts >= 5) {
-      setPollingStatus(false);
-      toast.error('Délai de vérification dépassé');
-      return;
-    }
-
-    setPollingStatus(true);
-
-    try {
-      const response = await axios.get(`${API}/checkout/status/${sid}`);
-      
-      if (response.data.payment_status === 'paid') {
-        setPollingStatus(false);
-        toast.success('Paiement réussi!');
-        setTimeout(() => navigate('/waiter'), 2000);
-        return;
-      }
-
-      if (response.data.status === 'expired') {
-        setPollingStatus(false);
-        toast.error('Session de paiement expirée');
-        return;
-      }
-
-      pollingTimerRef.current = setTimeout(() => pollPaymentStatus(sid, attempts + 1), 2000);
-    } catch (error) {
-      setPollingStatus(false);
-      toast.error('Erreur vérification paiement');
-    }
-  };
-
-  const initiatePayment = async () => {
-    setProcessing(true);
-
-    try {
-      const originUrl = window.location.origin;
-      const response = await axios.post(`${API}/checkout/session`, {
-        order_id: orderId,
-        origin_url: originUrl
-      });
-
-      if (response.data.url) {
-        window.location.href = response.data.url;
-      }
-    } catch (error) {
-      const errorMsg = error.response?.data?.detail || 'Erreur lors de la création de la session de paiement';
-      toast.error(errorMsg);
-      setProcessing(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center" data-testid="payment-loading">
         <Loader2 className="w-8 h-8 animate-spin text-rose-600" />
-      </div>
-    );
-  }
-
-  if (pollingStatus) {
-    return (
-      <div className="min-h-screen bg-slate-950 chiromani-pattern flex items-center justify-center p-4" data-testid="payment-polling">
-        <Card className="w-full max-w-md bg-slate-900 border-slate-800">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <Loader2 className="w-12 h-12 animate-spin text-rose-600" />
-            </div>
-            <CardTitle className="text-slate-50">Vérification du paiement...</CardTitle>
-            <CardDescription className="text-slate-400">Veuillez patienter</CardDescription>
-          </CardHeader>
-        </Card>
       </div>
     );
   }
@@ -189,30 +106,12 @@ export const Payment = () => {
             </div>
           </div>
 
-          <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-md">
-            <p className="text-xs text-amber-500">
-              💳 Paiement par carte : montant converti en EUR (1 EUR = {KMF_TO_EUR_RATE.toFixed(2)} KMF)
+          <div className="bg-slate-800/50 border border-slate-700 p-3 rounded-md text-center">
+            <CreditCard className="w-5 h-5 mx-auto mb-1 text-slate-500" />
+            <p className="text-xs text-slate-500">
+              Paiement par carte — disponible prochainement
             </p>
           </div>
-
-          <Button
-            onClick={initiatePayment}
-            disabled={processing}
-            data-testid="pay-now-button"
-            className="w-full bg-rose-600 hover:bg-rose-700 text-white font-semibold py-6 text-lg"
-          >
-            {processing ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Traitement...
-              </>
-            ) : (
-              <>
-                <CreditCard className="w-5 h-5 mr-2" />
-                Payer maintenant
-              </>
-            )}
-          </Button>
 
           <Button
             onClick={() => navigate('/waiter')}
