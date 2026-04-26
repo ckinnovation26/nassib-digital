@@ -4,8 +4,114 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
-import { LogOut, CreditCard, FileText, CheckCircle, Clock, History, Filter } from 'lucide-react';
+import { LogOut, CreditCard, FileText, CheckCircle, Clock, History, Filter, Share2, Printer, X } from 'lucide-react';
 import { formatCurrency } from '../utils/currency';
+
+const EUR_RATE = 491.96775;
+const formatEUR = (kmf) => `${(kmf / EUR_RATE).toFixed(2).replace('.', ',')} €`;
+
+const TicketCaisse = ({ order, onClose }) => {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('fr-FR');
+  const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+  const ticketText = [
+    '=== TICKET DE CAISSE ===',
+    'Restaurant NASSIB — Comores',
+    `Date : ${dateStr}  ${timeStr}`,
+    `Table : ${order.table_number}  |  ${order.guests_count} couvert(s)`,
+    `Serveur : ${order.waiter_name}`,
+    '------------------------',
+    ...order.items.map(i => `${i.quantity}x ${i.menu_item_name}  ${Math.round(i.quantity * i.price).toLocaleString('fr-FR')} KMF`),
+    '------------------------',
+    `TOTAL : ${Math.round(order.total).toLocaleString('fr-FR')} KMF`,
+    `      ≈ ${formatEUR(order.total)}`,
+    'Mode : ESPÈCES',
+    '========================',
+    'Merci de votre visite !',
+    'Livraison : +269 332 0308',
+  ].join('\n');
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Ticket Nassib', text: ticketText }); }
+      catch {}
+    } else {
+      await navigator.clipboard.writeText(ticketText);
+      toast.success('Ticket copié dans le presse-papier');
+    }
+  };
+
+  const handlePrint = () => {
+    const win = window.open('', '_blank', 'width=320,height=600');
+    win.document.write(`<html><head><title>Ticket Nassib</title>
+    <style>body{font-family:monospace;font-size:13px;padding:12px;max-width:300px;margin:0 auto}
+    h2{text-align:center;font-size:15px}hr{border:none;border-top:1px dashed #000}
+    .center{text-align:center}.total{font-size:16px;font-weight:bold}
+    @media print{button{display:none}}</style></head><body>
+    <h2>TICKET DE CAISSE</h2>
+    <p style="text-align:center">Restaurant NASSIB — Comores</p>
+    <hr>
+    <p>${dateStr} &nbsp; ${timeStr}<br>Table <b>${order.table_number}</b> &nbsp;|&nbsp; ${order.guests_count} couvert(s)<br>Serveur : ${order.waiter_name}</p>
+    <hr>
+    ${order.items.map(i => `<p>${i.quantity}x ${i.menu_item_name}<span style="float:right">${Math.round(i.quantity * i.price).toLocaleString('fr-FR')} KMF</span></p>`).join('')}
+    <hr>
+    <p class="total">TOTAL<span style="float:right">${Math.round(order.total).toLocaleString('fr-FR')} KMF</span></p>
+    <p style="text-align:right;color:#666">≈ ${formatEUR(order.total)}</p>
+    <p>Mode : ESPÈCES</p>
+    <hr>
+    <p class="center">Merci de votre visite !<br>Livraison : +269 332 0308</p>
+    <br><button onclick="window.print()">Imprimer</button>
+    </body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl w-full max-w-xs shadow-2xl overflow-hidden">
+        <div className="bg-slate-900 px-4 py-3 flex items-center justify-between">
+          <span className="text-white font-bold text-sm">Ticket de caisse</span>
+          <button onClick={onClose} className="text-slate-400 hover:text-white"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-4 font-mono text-sm text-slate-800 space-y-1">
+          <p className="text-center font-black text-base">NASSIB</p>
+          <p className="text-center text-xs text-slate-500">Restaurant — Comores</p>
+          <p className="text-center text-xs text-slate-500">{dateStr} · {timeStr}</p>
+          <hr className="border-dashed border-slate-300 my-2" />
+          <p className="text-xs">Table <b>{order.table_number}</b> · {order.guests_count} couvert(s)</p>
+          <p className="text-xs">Serveur : {order.waiter_name}</p>
+          <hr className="border-dashed border-slate-300 my-2" />
+          {order.items.map((item, idx) => (
+            <div key={idx} className="flex justify-between text-xs">
+              <span>{item.quantity}x {item.menu_item_name}</span>
+              <span>{Math.round(item.quantity * item.price).toLocaleString('fr-FR')} KMF</span>
+            </div>
+          ))}
+          <hr className="border-dashed border-slate-300 my-2" />
+          <div className="flex justify-between font-black text-sm">
+            <span>TOTAL</span>
+            <span>{Math.round(order.total).toLocaleString('fr-FR')} KMF</span>
+          </div>
+          <div className="text-right text-xs text-slate-400">≈ {formatEUR(order.total)}</div>
+          <p className="text-xs text-slate-500">Mode : ESPÈCES</p>
+          <hr className="border-dashed border-slate-300 my-2" />
+          <p className="text-center text-xs text-slate-500">Merci de votre visite !</p>
+          <p className="text-center text-xs text-slate-400">+269 332 0308</p>
+        </div>
+        <div className="px-4 pb-4 flex gap-2">
+          <Button onClick={handleShare} className="flex-1 bg-rose-600 hover:bg-rose-700 text-white text-xs h-9">
+            <Share2 className="w-3.5 h-3.5 mr-1.5" />Partager
+          </Button>
+          <Button onClick={handlePrint} variant="outline" className="flex-1 border-slate-300 text-slate-700 text-xs h-9">
+            <Printer className="w-3.5 h-3.5 mr-1.5" />Imprimer
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -22,6 +128,7 @@ export const CashierDashboard = () => {
   const [historyStats, setHistoryStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
+  const [ticketOrder, setTicketOrder] = useState(null);
   const [activeTab, setActiveTab] = useState('encaissement');
 
   // Filtres historique
@@ -64,11 +171,12 @@ export const CashierDashboard = () => {
   };
 
   const handleCashPayment = async (orderId) => {
+    const orderData = orders.find(o => o.id === orderId);
     setProcessingId(orderId);
     try {
       await axios.post(`${API}/payment/cash`, { order_id: orderId });
       toast.success('Paiement cash enregistré');
-      await handleInvoice(orderId);
+      setTicketOrder(orderData);
       fetchOrders();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erreur paiement');
@@ -117,6 +225,7 @@ export const CashierDashboard = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 chiromani-pattern">
+      {ticketOrder && <TicketCaisse order={ticketOrder} onClose={() => setTicketOrder(null)} />}
       <header className="bg-slate-900 border-b border-slate-800 p-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div>
@@ -207,15 +316,15 @@ export const CashierDashboard = () => {
                             </div>
                           ))}
                         </div>
-                        <div className="flex gap-3">
+                        <div className="flex gap-2">
                           <Button onClick={() => handleCashPayment(order.id)} disabled={processingId === order.id}
                             className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold">
                             <CreditCard className="w-4 h-4 mr-2" />
                             {processingId === order.id ? 'Traitement...' : 'Encaisser cash'}
                           </Button>
-                          <Button onClick={() => handleInvoice(order.id)} variant="outline"
-                            className="border-slate-600 text-slate-300 hover:bg-slate-700">
-                            <FileText className="w-4 h-4 mr-2" />Facture PDF
+                          <Button onClick={() => handleInvoice(order.id)} variant="outline" title="Générer la facture PDF"
+                            className="border-slate-600 text-slate-300 hover:bg-slate-700 w-10 h-10 p-0 flex items-center justify-center">
+                            <FileText className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>

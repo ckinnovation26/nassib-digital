@@ -706,6 +706,13 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
         raise HTTPException(status_code=403, detail="Accès refusé")
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if not order: raise HTTPException(status_code=404, detail="Commande non trouvée")
+    # Résoudre le vrai nom du serveur depuis la base (waiter_id est fiable, pas waiter_name)
+    waiter_display = order.get("waiter_name", "N/A")
+    waiter_id = order.get("waiter_id", "")
+    if waiter_id:
+        waiter_doc = await db.users.find_one({"id": waiter_id}, {"_id": 0, "name": 1, "email": 1})
+        if waiter_doc:
+            waiter_display = waiter_doc.get("name") or waiter_doc.get("email", waiter_display)
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=1.5*cm, bottomMargin=2*cm)
     styles = getSampleStyleSheet()
@@ -734,7 +741,7 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
         except Exception: order_date = invoice_date
     info_data = [
         ["N° Commande:", order_id[:8].upper(), "Date commande:", str(order_date)],
-        ["Table:", str(order.get("table_number", "N/A")), "Serveur:", order.get("waiter_name", "N/A")],
+        ["Table:", str(order.get("table_number", "N/A")), "Serveur:", waiter_display],
         ["Statut paiement:", "PAYÉ" if order.get("payment_status") == "paid" else "NON PAYÉ", "Mode:", (order.get("payment_method") or "N/A").upper()],
     ]
     info_table = PDFTable(info_data, colWidths=[3*cm, 4.5*cm, 3*cm, 4.5*cm])
