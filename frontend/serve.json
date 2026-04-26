@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/logiciel", "destination": "/logiciel/index.html" },
+    { "source": "/logiciel/**", "destination": "/logiciel/index.html" }
+  ]
+}
