@@ -80,4 +80,9 @@ agenthub/agents/youtube/db
 .cache/
 
 # Mobile development
-android-sdk/ 
+android-sdk/
+
+# Scripts sensibles (credentials, tests E2E, bootstrap — ne jamais committer)
+scripts/bootstrap_accounts.py
+scripts/test_e2e.py
+scripts/facture_test_*.pdf
