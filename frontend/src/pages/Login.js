@@ -30,7 +30,7 @@ export const Login = () => {
 
   const getDashboardRoute = (userRole) => {
     switch (userRole) {
-      case 'chef': return '/kitchen';
+      case 'cook': return '/kitchen';
       case 'accountant': return '/accounting';
       case 'admin': return '/admin';
       default: return '/waiter';

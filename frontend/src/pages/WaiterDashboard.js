@@ -308,7 +308,7 @@ export const WaiterDashboard = () => {
                       onChange={(e) => {
                         const t = tables.find(t => t.id === e.target.value);
                         setSelectedTable(t);
-                        if (t) { const r = t.capacity - (t.occupied_seats || 0); setGuestsCount(Math.max(1, Math.min(1, r))); }
+                        if (t) { const r = t.capacity - (t.occupied_seats || 0); setGuestsCount(Math.max(1, Math.min(guestsCount, r))); }
                       }}>
                       <option value="">⚠️ Sélectionner une table</option>
                       {tables.filter(t => t.status === 'free' || t.status === 'partial').map(table => (

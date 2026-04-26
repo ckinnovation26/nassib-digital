@@ -142,8 +142,8 @@ class PaymentTransaction(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-def create_token(user_id: str, email: str, role: str) -> str:
-    payload = {"user_id": user_id, "email": email, "role": role, "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION)}
+def create_token(user_id: str, email: str, role: str, name: str = "") -> str:
+    payload = {"user_id": user_id, "email": email, "role": role, "name": name, "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION)}
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 async def get_current_user(authorization: str = Header(None)) -> Dict[str, Any]:
@@ -157,6 +157,18 @@ async def get_current_user(authorization: str = Header(None)) -> Dict[str, Any]:
         raise HTTPException(status_code=401, detail="Token expiré")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token invalide")
+
+def parse_date_param(value: Optional[str], end_of_day: bool = False) -> Optional[str]:
+    """Valide et normalise un paramètre de date ISO (YYYY-MM-DD). Lève 400 si invalide."""
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.strip()[:10])
+        if end_of_day:
+            dt = dt.replace(hour=23, minute=59, second=59)
+        return dt.isoformat()
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail=f"Format de date invalide : '{value}'. Attendu YYYY-MM-DD")
 
 def fmt_eur(amount_kmf: float) -> str:
     eur = amount_kmf / EUR_TO_KMF
@@ -178,14 +190,14 @@ async def register(user_data: UserRegister, current_user: Dict = Depends(get_cur
     user_dict["password_hash"] = pwd_context.hash(user_data.password)
     user_dict["created_at"] = user_dict["created_at"].isoformat()
     await db.users.insert_one(user_dict)
-    return {"user": user.model_dump(), "token": create_token(user.id, user.email, user.role)}
+    return {"user": user.model_dump(), "token": create_token(user.id, user.email, user.role, user.name)}
 
 @api_router.post("/auth/login")
 async def login(credentials: UserLogin):
     user_doc = await db.users.find_one({"email": credentials.email}, {"_id": 0})
     if not user_doc or not pwd_context.verify(credentials.password, user_doc["password_hash"]):
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect")
-    token = create_token(user_doc["id"], user_doc["email"], user_doc["role"])
+    token = create_token(user_doc["id"], user_doc["email"], user_doc["role"], user_doc.get("name", ""))
     user_doc.pop("password_hash", None)
     if isinstance(user_doc.get("created_at"), str):
         user_doc["created_at"] = datetime.fromisoformat(user_doc["created_at"])
@@ -268,7 +280,9 @@ async def create_table(table_data: TableCreate, current_user: Dict = Depends(get
     return table
 
 @api_router.put("/tables/{table_id}", response_model=Table)
-async def update_table(table_id: str, table_data: TableUpdate):
+async def update_table(table_id: str, table_data: TableUpdate, current_user: Dict = Depends(get_current_user)):
+    if current_user["role"] not in ["admin", "waiter", "cashier"]:
+        raise HTTPException(status_code=403, detail="Accès refusé")
     result = await db.tables.update_one({"id": table_id}, {"$set": {"status": table_data.status}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Table non trouvée")
@@ -353,7 +367,7 @@ async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get
         items_with_prep_time.append(item_dict)
     order = Order(
         table_id=order_data.table_id, table_number=table["number"],
-        waiter_id=current_user["user_id"], waiter_name=current_user.get("email", "Unknown"),
+        waiter_id=current_user["user_id"], waiter_name=current_user.get("name") or current_user.get("email", "Unknown"),
         items=items_with_prep_time, total=total,
         guests_count=order_data.guests_count, estimated_preparation_time=max_prep_time
     )
@@ -367,7 +381,7 @@ async def create_order(order_data: OrderCreate, current_user: Dict = Depends(get
     return order
 
 @api_router.get("/orders", response_model=List[Order])
-async def get_orders(status: Optional[str] = None, table_id: Optional[str] = None):
+async def get_orders(status: Optional[str] = None, table_id: Optional[str] = None, current_user: Dict = Depends(get_current_user)):
     query = {}
     if status: query["status"] = status
     if table_id: query["table_id"] = table_id
@@ -378,7 +392,7 @@ async def get_orders(status: Optional[str] = None, table_id: Optional[str] = Non
     return orders
 
 @api_router.get("/orders/{order_id}", response_model=Order)
-async def get_order(order_id: str):
+async def get_order(order_id: str, current_user: Dict = Depends(get_current_user)):
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if not order: raise HTTPException(status_code=404, detail="Commande non trouvée")
     if isinstance(order.get("created_at"), str): order["created_at"] = datetime.fromisoformat(order["created_at"])
@@ -386,7 +400,9 @@ async def get_order(order_id: str):
     return order
 
 @api_router.put("/orders/{order_id}/status", response_model=Order)
-async def update_order_status(order_id: str, status_data: OrderStatusUpdate):
+async def update_order_status(order_id: str, status_data: OrderStatusUpdate, current_user: Dict = Depends(get_current_user)):
+    if current_user["role"] not in ["admin", "cook", "waiter", "cashier"]:
+        raise HTTPException(status_code=403, detail="Accès refusé")
     update_data = {"status": status_data.status, "updated_at": datetime.now(timezone.utc).isoformat()}
     if status_data.status == "in_progress":
         update_data["preparation_started_at"] = datetime.now(timezone.utc).isoformat()
@@ -459,13 +475,10 @@ async def get_cashier_history(
     if current_user["role"] not in ["admin", "cashier"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
     query = {"payment_status": "paid"}
-    if date_from: query.setdefault("created_at", {})["$gte"] = date_from
-    if date_to:
-        try:
-            dt_to = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
-            query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
-        except Exception:
-            query.setdefault("created_at", {})["$lte"] = date_to
+    d_from = parse_date_param(date_from)
+    d_to = parse_date_param(date_to, end_of_day=True)
+    if d_from: query.setdefault("created_at", {})["$gte"] = d_from
+    if d_to: query.setdefault("created_at", {})["$lte"] = d_to
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     for order in orders:
         if isinstance(order.get("created_at"), str): order["created_at"] = datetime.fromisoformat(order["created_at"])
@@ -485,13 +498,10 @@ async def get_dashboard_stats(
         raise HTTPException(status_code=403, detail="Accès refusé")
     today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     period_query = {"payment_status": "paid"}
-    if date_from: period_query.setdefault("created_at", {})["$gte"] = date_from
-    if date_to:
-        try:
-            dt_to = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
-            period_query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
-        except Exception:
-            period_query.setdefault("created_at", {})["$lte"] = date_to
+    d_from = parse_date_param(date_from)
+    d_to = parse_date_param(date_to, end_of_day=True)
+    if d_from: period_query.setdefault("created_at", {})["$gte"] = d_from
+    if d_to: period_query.setdefault("created_at", {})["$lte"] = d_to
     total_orders = await db.orders.count_documents({})
     today_orders = await db.orders.count_documents({"created_at": {"$gte": today.isoformat()}})
     pipeline = [{"$match": period_query}, {"$group": {"_id": None, "total": {"$sum": "$total"}}}]
@@ -512,13 +522,10 @@ async def get_accounting_orders(
     if current_user["role"] not in ["admin", "accountant"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
     query = {}
-    if date_from: query.setdefault("created_at", {})["$gte"] = date_from
-    if date_to:
-        try:
-            dt_to = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
-            query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
-        except Exception:
-            query.setdefault("created_at", {})["$lte"] = date_to
+    d_from = parse_date_param(date_from)
+    d_to = parse_date_param(date_to, end_of_day=True)
+    if d_from: query.setdefault("created_at", {})["$gte"] = d_from
+    if d_to: query.setdefault("created_at", {})["$lte"] = d_to
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(5000)
     user_cache = {}
     for order in orders:
@@ -555,13 +562,10 @@ async def export_accounting_csv(
     if current_user["role"] not in ["admin", "accountant"]:
         raise HTTPException(status_code=403, detail="Accès refusé")
     query = {"payment_status": "paid"}
-    if date_from: query.setdefault("created_at", {})["$gte"] = date_from
-    if date_to:
-        try:
-            dt_to = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
-            query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
-        except Exception:
-            query.setdefault("created_at", {})["$lte"] = date_to
+    d_from = parse_date_param(date_from)
+    d_to = parse_date_param(date_to, end_of_day=True)
+    if d_from: query.setdefault("created_at", {})["$gte"] = d_from
+    if d_to: query.setdefault("created_at", {})["$lte"] = d_to
     orders = await db.orders.find(query, {"_id": 0}).sort("created_at", -1).to_list(10000)
     user_cache = {}
     for order in orders:
@@ -616,13 +620,10 @@ async def get_kitchen_performance(
         raise HTTPException(status_code=403, detail="Accès refusé — admin uniquement")
 
     query = {"preparation_started_at": {"$exists": True, "$ne": None}}
-    if date_from: query.setdefault("created_at", {})["$gte"] = date_from
-    if date_to:
-        try:
-            dt_to = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59)
-            query.setdefault("created_at", {})["$lte"] = dt_to.isoformat()
-        except Exception:
-            query.setdefault("created_at", {})["$lte"] = date_to
+    d_from = parse_date_param(date_from)
+    d_to = parse_date_param(date_to, end_of_day=True)
+    if d_from: query.setdefault("created_at", {})["$gte"] = d_from
+    if d_to: query.setdefault("created_at", {})["$lte"] = d_to
 
     orders = await db.orders.find(query, {"_id": 0}).to_list(5000)
 
@@ -787,7 +788,8 @@ async def generate_order_invoice(order_id: str, current_user: Dict = Depends(get
     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=facture_nassib_{order_id[:8]}.pdf"})
 
 app.include_router(api_router)
-app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','), allow_methods=["*"], allow_headers=["*"])
+_default_origins = 'https://nassib.rest,https://www.nassib.rest,http://localhost:3000'
+app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=os.environ.get('CORS_ORIGINS', _default_origins).split(','), allow_methods=["*"], allow_headers=["*"])
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 

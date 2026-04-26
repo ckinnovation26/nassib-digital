@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
@@ -25,6 +25,7 @@ export const Payment = () => {
   const [processing, setProcessing] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [pollingStatus, setPollingStatus] = useState(false);
+  const pollingTimerRef = useRef(null);
 
   useEffect(() => {
     fetchOrder();
@@ -34,6 +35,7 @@ export const Payment = () => {
       setSessionId(sid);
       pollPaymentStatus(sid);
     }
+    return () => { if (pollingTimerRef.current) clearTimeout(pollingTimerRef.current); };
   }, [orderId]);
 
   const fetchOrder = async () => {
@@ -73,7 +75,7 @@ export const Payment = () => {
         return;
       }
 
-      setTimeout(() => pollPaymentStatus(sid, attempts + 1), 2000);
+      pollingTimerRef.current = setTimeout(() => pollPaymentStatus(sid, attempts + 1), 2000);
     } catch (error) {
       setPollingStatus(false);
       toast.error('Erreur vérification paiement');
