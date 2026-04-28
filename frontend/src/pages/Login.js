@@ -84,19 +84,19 @@ export const Login = () => {
             >
               {loading ? 'Chargement...' : 'Se connecter'}
             </Button>
+            <div className="pt-1 text-center">
+              <a
+                href="https://nassib-guide.netlify.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors"
+              >
+                © CK Innovation — Guide d'installation du logiciel
+              </a>
+            </div>
           </form>
         </CardContent>
       </Card>
-      <div className="mt-6 text-center">
-        <a
-          href="https://nassib-guide.netlify.app"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[10px] text-slate-700 hover:text-slate-500 transition-colors"
-        >
-          © CK Innovation — Guide d'installation du logiciel
-        </a>
-      </div>
     </div>
   );
 };
