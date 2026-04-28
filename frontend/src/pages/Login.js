@@ -86,7 +86,7 @@ export const Login = () => {
             </Button>
             <div className="pt-1 text-center">
               <a
-                href="https://nassib-guide.netlify.app"
+                href="https://guide.nassib.rest"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors"
